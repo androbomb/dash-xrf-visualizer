@@ -1,7 +1,7 @@
 # XRF-only visualizer — project to-do
 
 > Future requirements are user decisions, not verified legacy implementation.
-> M0 completed 2026-11-10; M1 completed 2026-11-10.
+> M0, M1, M2 and M3 completed 2026-11-10.
 
 ## Now — M1 baseline + approved docs (completed 2026-11-10)
 
@@ -19,9 +19,9 @@
 - [x] `tests/test_readers.py`: fixture round-trips + schema validation + bounded metadata check of `data_example/` files.
 - [x] Gate: reader tests green (17/17), no AIRES coupling (grep clean).
 
-## After M2 (approval-gated)
+## After M3 (approval-gated)
 
-- [ ] M3 — `processing/`: `backend.py` (device policy: CPU default, explicit GPU opt-in) + `reductions.py` (map/ROI, keV↔channel via m/q, float64 rule); JAX parity vs `golden.json` (exact); GPU agreement test marked NOT TESTED until the user runs it.
+- [x] M3 — `processing/`: `backend.py` (x64 forced, native JAX device policy: CPU in this venv, GPU via `JAX_PLATFORM_NAME`, `backend_info`/`require_backend`) + `reductions.py` (`map_from_channels`, `spectrum_from_roi`, `spectrum_from_points`, `calibrate`, `energy_to_channel`, `channel_range_for_energy`; out-of-range raises ValueError); JAX parity vs `golden.json` **bit-exact** on all 7 keys; GPU agreement test marked NOT TESTED (skips here).
 - [ ] M4 — `ui/`: left image + right spectrum; zoom = selection (image zoom → spectrum, spectrum zoom → map); explicit selection: drag-mode select, numeric panel (x0,x1,y0,y1), multi-point; zmin/zmax, colorscale, lin/log; manual m/q calibration panel; `example.ipynb` with `path_to_file`.
 - [ ] M5 — AIRES/TF absence gate (grep), `deploy/{docker,wslc,apptainer}/` recipes marked NOT TESTED, final README pass.
 

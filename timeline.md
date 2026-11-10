@@ -42,3 +42,11 @@ been performed as part of creating these templates. Do not invent entries.
 - **Evidence:** pytest → 17 passed in 1.87 s (CPU); grep AIRES/TF in `src/` → 0 hits; both real example npz load successfully (bounded, 27/61 MB).
 - **Notes:** dash 4.5.0 auto-registers a pytest plugin (`dash.testing.plugin`), so pytest itself imports dash; the "data module never imports dash" gate therefore runs in a fresh subprocess. h5 `img` must be a Dataset (Groups rejected with a clear error).
 - **Next:** stop for user review; then M3 (processing: backend policy + JAX reductions).
+
+### 2026-11-10 — M3: processing (JAX float64 reductions) (completed)
+
+- **Objective:** `src/xrf_visualizer/processing/` with a device policy and plain float64 reductions (map from channel interval, spectrum from ROI/points), calibration helpers (m/q), exact parity vs `golden.json`.
+- **Work:** `processing/backend.py` (x64 forced; native JAX device selection — CPU in this venv, GPU follows `JAX_PLATFORM_NAME`; `current_device`, `backend_info`, `require_backend`); `processing/reductions.py` (`map_from_channels`, `spectrum_from_roi` with y=row/x=col, `spectrum_from_points`, `calibrate`, `energy_to_channel`, `channel_range_for_energy`; out-of-range inputs raise ValueError). Spec: `tests/test_processing.py` (8 tests, incl. the GPU bit-parity test marked NOT TESTED via skipif).
+- **Evidence:** pytest → 24 passed, 1 skipped (GPU, not tested) in ~8 s; all 7 golden keys bit-exact vs JAX output (float32 accumulation differs by ~2e-7 relative, so parity catches dtype regressions); real-data smoke (Mantegna npz, 76×177×500 float32): load 0.06 s, full map 0.17 s, ROI spectrum 0.09 s, all float64.
+- **Notes:** goldens were re-specified in this milestone to a *sequential* float64 reference (`tests/make_fixture.py` and `tests/test_baseline_reductions.py` updated, uncommitted at milestone start); `golden.json` values unchanged (sequential == pairwise for these shapes). Shortcut: XLA's reduction order is not strictly sequential — bit-exactness verified on CPU for fixture and real-data shapes; the GPU path may drift by a few ulp (NOT TESTED).
+- **Next:** stop for user review; then M4 (Dash UI).

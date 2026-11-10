@@ -73,5 +73,24 @@ the read-only audit of 2026-11-10 (legacy code + example files); facts marked
   `deploy/uv/README.md`, marked **NOT TESTED**. Known XLA behavior to guard:
   the GPU allocator pre-reserves a fraction of VRAM on first use (see that doc).
 
+## M3 reductions implementation (2026-11-10)
+
+- `src/xrf_visualizer/processing/` runs on JAX with **x64 forced**
+  (`jax_enable_x64`): cubes stay float32 in memory, only the reduction
+  accumulates in float64.
+- Device policy: native JAX selection (`JAX_PLATFORM_NAME`). The venv ships
+  CPU-only jax, so nothing touches the GPU; a `jax[cuda12]` build is the
+  documented **NOT TESTED** GPU variant (`deploy/uv/README.md`).
+- **Parity:** all 7 golden keys match bit-exactly on CPU (sequential
+  float64 reference). Float32 accumulation differs by ~2e-7 relative, so
+  exact parity catches a dtype regression. Shortcut: XLA's reduction order
+  is not strictly sequential; other shapes or the GPU backend may drift by
+  a few ulp (GPU parity test marked NOT TESTED).
+- API contract: `map_from_channels(cube, s, e)`, `spectrum_from_roi(cube,
+  y0, y1, x0, x1)` (y=row, x=col), `spectrum_from_points(cube, rows, cols)`,
+  `calibrate(C, m, q)`, `energy_to_channel(axis, E)`,
+  `channel_range_for_energy(axis, E_lo, E_hi)`; out-of-range inputs raise
+  ValueError (the UI clamps before calling).
+
 `operational_plan.md` owns scope and acceptance criteria; `AGENTS.md` owns
 rules; `timeline.md` records only work actually completed.

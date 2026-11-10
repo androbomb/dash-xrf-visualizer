@@ -12,11 +12,12 @@ parts were removed by decision; the custom CHNet raw reader is deferred.
 
 ## Status
 
-- M0 (read-only audit) and M1 (uv environment, baseline fixture + golden
-  tests, docs) completed 2026-11-10 — see `timeline.md`.
-- **Not implemented yet:** readers, JAX reductions, Dash UI (M2–M4).
-  `src/xrf_visualizer/` is a stub until then. Scope and acceptance criteria:
-  `operational_plan.md`; verified numerical conventions: `scientific_notes.md`.
+- M0 (read-only audit), M1 (uv environment, fixture + golden tests, docs),
+  M2 (readers, `XRFlines`) and M3 (JAX float64 reductions, bit-exact vs
+  goldens) completed 2026-11-10 — see `timeline.md`.
+- **Not implemented yet:** Dash UI (M4) and deployment recipes (M5).
+  Scope and acceptance criteria: `operational_plan.md`; verified numerical
+  conventions: `scientific_notes.md`.
 
 ## Setup (verified 2026-11-10)
 

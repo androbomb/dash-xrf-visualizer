@@ -5,8 +5,8 @@ Rules (see scientific_notes.md):
 - map from spectral interval [s:e) = plain sum over channels, NO weighting.
 - spectrum from spatial ROI [x0:x1, y0:y1) = plain sum over pixels, NO normalization.
 - reductions run in float64 regardless of storage dtype (real data is float32).
-M3 (JAX) and M4 (UI) must match these goldens exactly (int-free float64 sums,
-deterministic order).
+M3 (JAX) and M4 (UI) must match these goldens exactly: plain float64 sums in
+the documented sequential order (see scientific_notes.md).
 """
 import json
 from pathlib import Path
@@ -33,18 +33,27 @@ def golden() -> dict:
 
 
 def _ref_map(a: np.ndarray, s: int, e: int) -> np.ndarray:
-    """Reference map: plain channel sum, float64, clamped to [0, C]."""
+    """Reference map: plain channel sum, float64, sequential order, clamped to [0, C]."""
     C = a.shape[-1]
     s, e = max(0, min(s, C)), max(0, min(e, C))
-    return a[:, :, s:e].astype(np.float64).sum(axis=-1)
+    a64 = a.astype(np.float64)
+    out = np.zeros(a.shape[:2])
+    for c in range(s, e):
+        out += a64[:, :, c]
+    return out
 
 
 def _ref_spectrum(a: np.ndarray, x0: int, y0: int, x1: int, y1: int) -> np.ndarray:
-    """Reference spectrum: plain spatial sum, float64, clamped to shape."""
+    """Reference spectrum: plain spatial sum, float64, sequential (row-major), clamped."""
     H, W = a.shape[:2]
     x0, y0 = max(0, min(x0, H)), max(0, min(y0, W))
     x1, y1 = max(0, min(x1, H)), max(0, min(y1, W))
-    return a[x0:x1, y0:y1, :].astype(np.float64).sum(axis=(0, 1))
+    a64 = a.astype(np.float64)
+    out = np.zeros(a.shape[-1])
+    for h in range(x0, x1):
+        for w in range(y0, y1):
+            out += a64[h, w, :]
+    return out
 
 
 def test_golden_reproducible(cube, golden):
@@ -93,7 +102,7 @@ def test_roi_rules(cube, golden):
 def test_float64_promotion_rule(cube, golden):
     """float32 storage must not leak into results: float64 accumulation is exact."""
     s32 = cube[:, :, 100:120].sum(axis=-1)          # float32 accumulation
-    s64 = cube[:, :, 100:120].astype(np.float64).sum(axis=-1)
+    s64 = _ref_map(cube, 100, 120)                  # documented float64 sequential path
     assert s32.dtype == np.float32
     assert s64.dtype == np.float64
     # the documented rule: goldens match the float64 path, and the two can differ

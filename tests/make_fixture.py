@@ -32,19 +32,37 @@ def make_cube() -> np.ndarray:
     return cube.astype(np.float32)
 
 
+def _seq_map(a64: np.ndarray, s: int, e: int) -> np.ndarray:
+    """Sequential channel sum (the documented reference order)."""
+    out = np.zeros(a64.shape[:2])
+    for c in range(s, e):
+        out += a64[:, :, c]
+    return out
+
+
+def _seq_spec(a64: np.ndarray, y0: int, y1: int, x0: int, x1: int) -> np.ndarray:
+    """Sequential pixel sum, row-major (row, then column)."""
+    out = np.zeros(a64.shape[-1])
+    for h in range(y0, y1):
+        for w in range(x0, x1):
+            out += a64[h, w, :]
+    return out
+
+
 def golden(cube: np.ndarray) -> dict:
     a64 = cube.astype(np.float64)  # documented rule: reduce in float64
+    H, W, C = a64.shape
     return {
         "shape": list(cube.shape),
         "dtype": str(cube.dtype),
-        "map_full": a64.sum(axis=-1),
-        "map_interval_100_120": a64[:, :, 100:120].sum(axis=-1),
-        "map_single_channel_250": a64[:, :, 250],
-        "map_empty_interval_50_50": a64[:, :, 50:50].sum(axis=-1),
-        "spectrum_full": a64.sum(axis=(0, 1)),
-        "spectrum_roi_10_20_30_40": a64[10:20, 30:40, :].sum(axis=(0, 1)),
-        "spectrum_single_pixel_10_10": a64[10, 10, :],
-        "total": a64.sum(),
+        "map_full": _seq_map(a64, 0, C),
+        "map_interval_100_120": _seq_map(a64, 100, 120),
+        "map_single_channel_250": a64[:, :, 250].copy(),
+        "map_empty_interval_50_50": _seq_map(a64, 50, 50),
+        "spectrum_full": _seq_spec(a64, 0, H, 0, W),
+        "spectrum_roi_10_20_30_40": _seq_spec(a64, 10, 20, 30, 40),
+        "spectrum_single_pixel_10_10": a64[10, 10, :].copy(),
+        "total": float(_seq_spec(a64, 0, H, 0, W).sum()),
     }
 
 
