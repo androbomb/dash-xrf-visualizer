@@ -1,0 +1,38 @@
+# Merge with the existing repository .gitignore; do not blindly overwrite it.
+
+# Bootstrap/reference-only original. Never use as the runtime source package.
+/dash-xrf-analyzer/
+
+# example data 
+data_example/
+
+# Python cache, test/build output and local Python environments
+__pycache__/
+*.py[cod]
+.ipynb_checkpoints/
+.pytest_cache/
+.ruff_cache/
+.mypy_cache/
+.coverage
+htmlcov/
+.venv/
+venv/
+build/
+dist/
+*.egg-info/
+
+# Local/editor files
+.DS_Store
+.vscode/
+
+# Generated XRF outputs (dedicated, not raw inputs)
+/outputs/
+/results/
+/data/raw/
+
+# Optional LaTeX output
+/notes/build/
+
+# Do NOT ignore pyproject.toml or uv.lock: lock file must be versioned.
+# Do NOT globally ignore .h5/.hdf5/.npy/.npz: allow small reviewed tests/fixtures.
+# Check whether legacy files are already tracked: .gitignore alone will not untrack.
