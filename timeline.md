@@ -34,3 +34,11 @@ been performed as part of creating these templates. Do not invent entries.
 - **Decisions:** default environment is CPU-only JAX (no GPU context at import); GPU = opt-in `jax[cuda12]` variant, documented, NOT TESTED.
 - **Limitations / blockers:** GPU path, containers and notebook inline mode not exercised; no push performed (remote `origin` exists; push is user-only).
 - **Next:** stop for user review; then M2 (readers + source package).
+
+### 2026-11-10 — M2: readers + source package (completed)
+
+- **Objective:** data readers for .h5/.npz/.npy with schema validation; XRFlines migrated into the package.
+- **Work:** `src/xrf_visualizer/data/__init__.py` (`XrfCube`, `load_cube`, `load_xrf_lines`; 85 lines); `src/xrf_visualizer/data/XRFlines.json` (copied from legacy `application/static/`, 347 CHNet lines); `tests/test_readers.py` (12 tests: round-trip across the three encodings, optional `energy` contract, 6 validation-error cases, dash-import gate in a fresh subprocess, XRFlines spot checks, real `data_example/` metadata check).
+- **Evidence:** pytest → 17 passed in 1.87 s (CPU); grep AIRES/TF in `src/` → 0 hits; both real example npz load successfully (bounded, 27/61 MB).
+- **Notes:** dash 4.5.0 auto-registers a pytest plugin (`dash.testing.plugin`), so pytest itself imports dash; the "data module never imports dash" gate therefore runs in a fresh subprocess. h5 `img` must be a Dataset (Groups rejected with a clear error).
+- **Next:** stop for user review; then M3 (processing: backend policy + JAX reductions).

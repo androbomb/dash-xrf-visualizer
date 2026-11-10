@@ -10,14 +10,14 @@
 - [x] Baseline tests: golden reductions (float64 rule), interval/ROI edge cases, encoding consistency — 5 passed in <1 s.
 - [x] Docs sync: `scientific_notes.md` (verified conventions), `operational_plan.md` (M0 findings), this file, `timeline.md`, `AGENTS.md`, real `README.md` (bootstrap removed).
 - [x] Jupyter kernel registered from the project venv (`xrf-viz`); instructions in `deploy/uv/README.md`.
-- [ ] Gate: user review of M1 → approve M2.
+- [x] Gate: user review of M1 → approve M2 (approved 2026-11-10).
 
-## Next — M2: readers + source package (requires approval)
+## Done — M2: readers + source package (completed 2026-11-10)
 
-- [ ] `src/xrf_visualizer/data/`: readers for `.h5` (key `img`), `.npz` (`img` + optional `energy`), `.npy` (channel axis only); schema validation (ndim=3, dtype, shape) with informative errors; readers never import Dash.
-- [ ] Migrate `XRFlines.json` (347 CHNet lines, legacy `application/static/`) into the package as static data.
-- [ ] `tests/test_readers.py`: fixture round-trips + schema validation + bounded metadata check of `data_example/` files.
-- [ ] Gate: reader tests green, no AIRES coupling.
+- [x] `src/xrf_visualizer/data/`: readers for `.h5` (key `img`), `.npz` (`img` + optional `energy`), `.npy` (channel axis only); schema validation (ndim=3, dtype, shape) with informative errors; readers never import Dash.
+- [x] Migrate `XRFlines.json` (347 CHNet lines, legacy `application/static/`) into the package as static data.
+- [x] `tests/test_readers.py`: fixture round-trips + schema validation + bounded metadata check of `data_example/` files.
+- [x] Gate: reader tests green (17/17), no AIRES coupling (grep clean).
 
 ## After M2 (approval-gated)
 

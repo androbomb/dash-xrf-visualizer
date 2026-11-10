@@ -1,0 +1,1390 @@
+[
+    {
+        "element": "Be (Ka)",
+        "value": 0.108
+    },
+    {
+        "element": "Bo (Ka)",
+        "value": 0.183
+    },
+    {
+        "element": "C (Ka)",
+        "value": 0.277
+    },
+    {
+        "element": "N (Ka)",
+        "value": 0.392
+    },
+    {
+        "element": "O (Ka)",
+        "value": 0.525
+    },
+    {
+        "element": "F (Ka)",
+        "value": 0.677
+    },
+    {
+        "element": "Ne (Ka)",
+        "value": 0.849
+    },
+    {
+        "element": "Na (Ka)",
+        "value": 1.040
+    },
+    {
+        "element": "Mg (Ka)",
+        "value": 1.254
+    },
+    {
+        "element": "Mg (Kb)",
+        "value": 1.302
+    },
+    {
+        "element": "Al (Ka)",
+        "value": 1.486
+    },
+    {
+        "element": "Al (Kb)",
+        "value": 1.557
+    },
+    {
+        "element": "Si (Ka)",
+        "value": 1.740
+    },
+    {
+        "element": "Si (Kb)",
+        "value": 1.1837
+    },
+    {
+        "element": "P (Ka)",
+        "value": 2.010
+    },
+    {
+        "element": "P (Kb)",
+        "value": 2.139
+    },
+    {
+        "element": "S (Ka)",
+        "value": 2.309
+    },
+    {
+        "element": "S (Kb)",
+        "value": 2.465
+    },
+    {
+        "element": "Cl (Ka)",
+        "value": 2.622
+    },
+    {
+        "element": "Cl (Kb)",
+        "value": 2.812
+    },
+    {
+        "element": "Ar (Ka)",
+        "value": 2.958
+    },
+    {
+        "element": "Ar (Kb)",
+        "value": 3.190
+    },
+    {
+        "element": "K (Ka)",
+        "value": 3.314
+    },
+    {
+        "element": "K (Kb)",
+        "value": 3.590
+    },
+    {
+        "element": "Ca (Ka)",
+        "value": 3.692
+    },
+    {
+        "element": "Ca (Kb)",
+        "value": 4.013
+    },
+    {
+        "element": "Ca (La)",
+        "value": 0.341
+    },
+    {
+        "element": "Ca (Lb)",
+        "value": 0.345
+    },
+    {
+        "element": "Sc (Ka)",
+        "value": 4.093
+    },
+    {
+        "element": "Sc (Kb)",
+        "value": 4.464
+    },
+    {
+        "element": "Sc (La)",
+        "value": 0.395
+    },
+    {
+        "element": "Sc (Lb)",
+        "value": 0.400
+    },
+    {
+        "element": "Ti (Ka)",
+        "value": 4.512
+    },
+    {
+        "element": "Ti (Kb)",
+        "value": 4.933
+    },
+    {
+        "element": "Ti (La)",
+        "value": 0.452
+    },
+    {
+        "element": "Ti (Lb)",
+        "value": 0.458
+    },
+    {
+        "element": "V (Ka)",
+        "value": 4.953
+    },
+    {
+        "element": "V (Kb)",
+        "value": 4.428
+    },
+    {
+        "element": "V (La)",
+        "value": 0.510
+    },
+    {
+        "element": "V (Lb)",
+        "value": 0.518
+    },
+    {
+        "element": "Cr (Ka)",
+        "value": 5.415
+    },
+    {
+        "element": "Cr (Kb)",
+        "value": 5.947
+    },
+    {
+        "element": "Cr (La)",
+        "value": 0.572
+    },
+    {
+        "element": "Cr (Lb)",
+        "value": 0.582
+    },
+    {
+        "element": "Mn (Ka)",
+        "value": 5.900
+    },
+    {
+        "element": "Mn (Kb)",
+        "value": 6.492
+    },
+    {
+        "element": "Mn (La)",
+        "value": 0.637
+    },
+    {
+        "element": "Mn (Lb)",
+        "value": 0.648
+    },
+    {
+        "element": "Fe (Ka)",
+        "value": 6.405
+    },
+    {
+        "element": "Fe (Kb)",
+        "value": 7.059
+    },
+    {
+        "element": "Fe (La)",
+        "value": 0.705
+    },
+    {
+        "element": "Fe (Lb)",
+        "value": 0.718
+    },
+    {
+        "element": "Co (Ka)",
+        "value": 6.931
+    },
+    {
+        "element": "Co (Kb)",
+        "value": 7.649
+    },
+    {
+        "element": "Co (La)",
+        "value": 0.775
+    },
+    {
+        "element": "Co (Lb)",
+        "value": 0.790
+    },
+    {
+        "element": "Ni (Ka)",
+        "value": 7.480
+    },
+    {
+        "element": "Ni (Kb)",
+        "value": 8.267
+    },
+    {
+        "element": "Ni (Ll)",
+        "value": 0.743
+    },
+    {
+        "element": "Ni (La)",
+        "value": 0.849
+    },
+    {
+        "element": "Ni (Ln)",
+        "value": 0.760
+    },
+    {
+        "element": "Ni (Lb)",
+        "value": 0.866
+    },
+    {
+        "element": "Cu (Ka)",
+        "value": 8.046
+    },
+    {
+        "element": "Cu (Kb)",
+        "value": 8.904
+    },
+    {
+        "element": "Cu (Ll)",
+        "value": 0.811
+    },
+    {
+        "element": "Cu (La)",
+        "value": 0.928
+    },
+    {
+        "element": "Cu (Ln)",
+        "value": 0.831
+    },
+    {
+        "element": "Cu (Lb)",
+        "value": 0.947
+    },
+    {
+        "element": "Zn (Ka)",
+        "value": 8.637
+    },
+    {
+        "element": "Zn (Kb)",
+        "value": 9.570
+    },
+    {
+        "element": "Zn (Ll)",
+        "value": 0.884
+    },
+    {
+        "element": "Zn (La)",
+        "value": 1.012
+    },
+    {
+        "element": "Zn (Ln)",
+        "value": 0.907
+    },
+    {
+        "element": "Zn (Lb)",
+        "value": 1.035
+    },
+    {
+        "element": "Ga (Ka)",
+        "value": 9.251
+    },
+    {
+        "element": "Ga (Kb)",
+        "value": 10.267
+    },
+    {
+        "element": "Ga (Ll)",
+        "value": 0.957
+    },
+    {
+        "element": "Ga (La)",
+        "value": 1.098
+    },
+    {
+        "element": "Ga (Ln)",
+        "value": 0.984
+    },
+    {
+        "element": "Ga (Lb)",
+        "value": 1.125
+    },
+    {
+        "element": "Ge (Ka)",
+        "value": 9.886
+    },
+    {
+        "element": "Ge (Kb)",
+        "value": 10.982
+    },
+    {
+        "element": "Ge (Ll)",
+        "value": 1.037
+    },
+    {
+        "element": "Ge (La)",
+        "value": 1.188
+    },
+    {
+        "element": "Ge (Ln)",
+        "value": 1.068
+    },
+    {
+        "element": "Ge (Lb)",
+        "value": 1.218
+    },
+    {
+        "element": "As (Ka)",
+        "value": 10.543
+    },
+    {
+        "element": "As (Kb)",
+        "value": 11.726
+    },
+    {
+        "element": "As (Ll)",
+        "value": 1.120
+    },
+    {
+        "element": "As (La)",
+        "value": 1.282
+    },
+    {
+        "element": "As (Ln)",
+        "value": 1.155
+    },
+    {
+        "element": "As (Lb)",
+        "value": 1.317
+    },
+    {
+        "element": "Se (Ka)",
+        "value": 11.224
+    },
+    {
+        "element": "Se (Kb)",
+        "value": 12.497
+    },
+    {
+        "element": "Se (Ll)",
+        "value": 1.204
+    },
+    {
+        "element": "Se (La)",
+        "value": 1.379
+    },
+    {
+        "element": "Se (Ln)",
+        "value": 1.245
+    },
+    {
+        "element": "Se (Lb)",
+        "value": 1.419
+    },
+    {
+        "element": "Br (Ka)",
+        "value": 11.924
+    },
+    {
+        "element": "Br (Kb)",
+        "value": 13.292
+    },
+    {
+        "element": "Br (Ll)",
+        "value": 1.293
+    },
+    {
+        "element": "Br (La)",
+        "value": 1.481
+    },
+    {
+        "element": "Br (Ln)",
+        "value": 1.339
+    },
+    {
+        "element": "Br (Lb)",
+        "value": 1.526
+    },
+    {
+        "element": "Kr (Ka)",
+        "value": 12.648
+    },
+    {
+        "element": "Kr (Kb)",
+        "value": 14.112
+    },
+    {
+        "element": "Kr (Ll)",
+        "value": 1.383
+    },
+    {
+        "element": "Kr (La)",
+        "value": 1.585
+    },
+    {
+        "element": "Kr (Ln)",
+        "value": 1.435
+    },
+    {
+        "element": "Kr (Lb)",
+        "value": 1.636
+    },
+    {
+        "element": "Rb (Ka)",
+        "value": 13.396
+    },
+    {
+        "element": "Rb (Kb)",
+        "value": 14.961
+    },
+    {
+        "element": "Rb (Ll)",
+        "value": 1.482
+    },
+    {
+        "element": "Rb (La)",
+        "value": 1.692
+    },
+    {
+        "element": "Rb (Ln)",
+        "value": 1.542
+    },
+    {
+        "element": "Rb (Lb)",
+        "value": 1.751
+    },
+    {
+        "element": "Sr (Ka)",
+        "value": 14.165
+    },
+    {
+        "element": "Sr (Kb)",
+        "value": 15.835
+    },
+    {
+        "element": "Sr (Ll)",
+        "value": 1.582
+    },
+    {
+        "element": "Sr (La)",
+        "value": 1.806
+    },
+    {
+        "element": "Sr (Ln)",
+        "value": 1.649
+    },
+    {
+        "element": "Sr (Lb)",
+        "value": 1.871
+    },
+    {
+        "element": "Y (Ka)",
+        "value": 14.958
+    },
+    {
+        "element": "Y (Kb)",
+        "value": 16.739
+    },
+    {
+        "element": "Y (Ll)",
+        "value": 1.686
+    },
+    {
+        "element": "Y (La)",
+        "value": 1.924
+    },
+    {
+        "element": "Y (Ln)",
+        "value": 1.762
+    },
+    {
+        "element": "Y (Lb)",
+        "value": 1.998
+    },
+    {
+        "element": "Zr (Ka)",
+        "value": 15.775
+    },
+    {
+        "element": "Zr (Kb)",
+        "value": 17.668
+    },
+    {
+        "element": "Zr (Ll)",
+        "value": 1.792
+    },
+    {
+        "element": "Zr (La)",
+        "value": 2.044
+    },
+    {
+        "element": "Zr (Ln)",
+        "value": 1.876
+    },
+    {
+        "element": "Zr (Lb)",
+        "value": 2.126
+    },
+    {
+        "element": "Nb (Ka)",
+        "value": 16.615
+    },
+    {
+        "element": "Nb (Kb)",
+        "value": 18.625
+    },
+    {
+        "element": "Nb (Ll)",
+        "value": 1.902
+    },
+    {
+        "element": "Nb (La)",
+        "value": 2.169
+    },
+    {
+        "element": "Nb (Ln)",
+        "value": 1.996
+    },
+    {
+        "element": "Nb (Lb)",
+        "value": 2.260
+    },
+    {
+        "element": "Mo (Ka)",
+        "value": 17.480
+    },
+    {
+        "element": "Mo (Kb)",
+        "value": 19.606
+    },
+    {
+        "element": "Mo (Ll)",
+        "value": 2.016
+    },
+    {
+        "element": "Mo (La)",
+        "value": 2.292
+    },
+    {
+        "element": "Mo (Ln)",
+        "value": 2.121
+    },
+    {
+        "element": "Mo (Lb)",
+        "value": 2.394
+    },
+    {
+        "element": "Tc (Ka)",
+        "value": 18.367
+    },
+    {
+        "element": "Tc (Kb)",
+        "value": 20.626
+    },
+    {
+        "element": "Tc (Ll)",
+        "value": 2.133
+    },
+    {
+        "element": "Tc (La)",
+        "value": 2.423
+    },
+    {
+        "element": "Tc (Ln)",
+        "value": 2.249
+    },
+    {
+        "element": "Tc (Lb)",
+        "value": 2.394
+    },
+    {
+        "element": "Ru (Ka)",
+        "value": 19.279
+    },
+    {
+        "element": "Ru (Kb)",
+        "value": 21.656
+    },
+    {
+        "element": "Ru (Ll)",
+        "value": 2.253
+    },
+    {
+        "element": "Ru (La)",
+        "value": 2.558
+    },
+    {
+        "element": "Mo (Ln)",
+        "value": 2.382
+    },
+    {
+        "element": "Ru (Lb)",
+        "value": 2.683
+    },
+    {
+        "element": "Rh (Ka)",
+        "value": 20.216
+    },
+    {
+        "element": "Rh (Kb)",
+        "value": 22.724
+    },
+    {
+        "element": "Rh (Ll)",
+        "value": 2.377
+    },
+    {
+        "element": "Rh (La)",
+        "value": 2.697
+    },
+    {
+        "element": "Rh (Ln)",
+        "value": 2.519
+    },
+    {
+        "element": "Rh (Lb)",
+        "value": 2.834
+    },
+    {
+        "element": "Pd (Ka)",
+        "value": 21.177
+    },
+    {
+        "element": "Pd (Kb)",
+        "value": 23.818
+    },
+    {
+        "element": "Pd (Ll)",
+        "value": 2.503
+    },
+    {
+        "element": "Pd (La)",
+        "value": 2.838
+    },
+    {
+        "element": "Pd (Ln)",
+        "value": 2.660
+    },
+    {
+        "element": "Pd (Lb)",
+        "value": 2.990
+    },
+    {
+        "element": "Ag (Ka)",
+        "value": 22.163
+    },
+    {
+        "element": "Ag (Kb)",
+        "value": 24.941
+    },
+    {
+        "element": "Ag (Ll)",
+        "value": 2.634
+    },
+    {
+        "element": "Ag (La)",
+        "value": 2.983
+    },
+    {
+        "element": "Ag (Ln)",
+        "value": 2.806
+    },
+    {
+        "element": "Ag (Lb)",
+        "value": 3.150
+    },
+    {
+        "element": "Cd (Ka)",
+        "value": 23.173
+    },
+    {
+        "element": "Cd (Kb)",
+        "value": 26.093
+    },
+    {
+        "element": "Cd (Ll)",
+        "value": 2.767
+    },
+    {
+        "element": "Cd (La)",
+        "value": 3.133
+    },
+    {
+        "element": "Cd (Ln)",
+        "value": 2.957
+    },
+    {
+        "element": "Cd (Lb)",
+        "value": 3.315
+    },
+    {
+        "element": "In (Ka)",
+        "value": 24.210
+    },
+    {
+        "element": "In (Kb)",
+        "value": 27.275
+    },
+    {
+        "element": "In (Ll)",
+        "value": 2.905
+    },
+    {
+        "element": "In (La)",
+        "value": 3.286
+    },
+    {
+        "element": "In (Ln)",
+        "value": 3.112
+    },
+    {
+        "element": "In (Lb)",
+        "value": 3.487
+    },
+    {
+        "element": "Sn (Ka)",
+        "value": 25.271
+    },
+    {
+        "element": "Sn (Kb)",
+        "value": 28.485
+    },
+    {
+        "element": "Sn (Ll)",
+        "value": 3.045
+    },
+    {
+        "element": "Sn (La)",
+        "value": 3.444
+    },
+    {
+        "element": "Sn (Ln)",
+        "value": 3.272
+    },
+    {
+        "element": "Sn (Lb)",
+        "value": 3.663
+    },
+    {
+        "element": "Sb (Ka)",
+        "value": 26.359
+    },
+    {
+        "element": "Sb (Kb)",
+        "value": 29.725
+    },
+    {
+        "element": "Sb (Ll)",
+        "value": 3.189
+    },
+    {
+        "element": "Sb (La)",
+        "value": 3.604
+    },
+    {
+        "element": "Sb (Ln)",
+        "value": 3.437
+    },
+    {
+        "element": "Sb (Lb)",
+        "value": 3.842
+    },
+    {
+        "element": "Te (Ka)",
+        "value": 27.473
+    },
+    {
+        "element": "Te (Kb)",
+        "value": 30.993
+    },
+    {
+        "element": "Te (Ll)",
+        "value": 3.335
+    },
+    {
+        "element": "Te (La)",
+        "value": 3.768
+    },
+    {
+        "element": "Te (Ln)",
+        "value": 3.606
+    },
+    {
+        "element": "Te (Lb)",
+        "value": 4.029
+    },
+    {
+        "element": "I (Ka)",
+        "value": 28.612
+    },
+    {
+        "element": "I (Kb)",
+        "value": 32.294
+    },
+    {
+        "element": "I (Ll)",
+        "value": 3.485
+    },
+    {
+        "element": "I (La)",
+        "value": 3.938
+    },
+    {
+        "element": "I (Ln)",
+        "value": 3.780
+    },
+    {
+        "element": "I (Lb)",
+        "value": 4.221
+    },
+    {
+        "element": "Xe (Ka)",
+        "value": 29.775
+    },
+    {
+        "element": "Xe (Kb)",
+        "value": 33.620
+    },
+    {
+        "element": "Xe (Ll)",
+        "value": 3.634
+    },
+    {
+        "element": "Xe (La)",
+        "value": 4.110
+    },
+    {
+        "element": "Xe (Ln)",
+        "value": 3.955
+    },
+    {
+        "element": "Xe (Lb)",
+        "value": 4.418
+    },
+    {
+        "element": "Cs (Ka)",
+        "value": 30.973
+    },
+    {
+        "element": "Cs (Kb)",
+        "value": 34.982
+    },
+    {
+        "element": "Cs (Ll)",
+        "value": 3.795
+    },
+    {
+        "element": "Cs (La)",
+        "value": 4.285
+    },
+    {
+        "element": "Cs (Ln)",
+        "value": 4.142
+    },
+    {
+        "element": "Cs (Lb)",
+        "value": 4.619
+    },
+    {
+        "element": "Ba (Ka)",
+        "value": 32.194
+    },
+    {
+        "element": "Ba (Kb)",
+        "value": 36.378
+    },
+    {
+        "element": "Ba (Ll)",
+        "value": 3.954
+    },
+    {
+        "element": "Ba (La)",
+        "value": 4.466
+    },
+    {
+        "element": "Ba (Ln)",
+        "value": 4.331
+    },
+    {
+        "element": "Ba (Lb)",
+        "value": 4.828
+    },
+    {
+        "element": "Hf (Ka)",
+        "value": 55.790
+    },
+    {
+        "element": "Hf (Kb)",
+        "value": 63.244
+    },
+    {
+        "element": "Hf (La)",
+        "value": 7.899
+    },
+    {
+        "element": "Hf (Ll)",
+        "value": 6.960
+    },
+    {
+        "element": "Hf (Lb)",
+        "value": 9.023
+    },
+    {
+        "element": "Hf (Ln)",
+        "value": 8.139
+    },
+    {
+        "element": "Hf (Lgamma)",
+        "value": 10.516
+    },
+    {
+        "element": "Hf (Ma)",
+        "value": 1.646
+    },
+    {
+        "element": "Hf (Mb)",
+        "value": 1.700
+    },
+    {
+        "element": "Ta (Ka)",
+        "value": 57.535
+    },
+    {
+        "element": "Ta (Kb)",
+        "value": 65.222
+    },
+    {
+        "element": "Ta (Ln)",
+        "value": 7.173
+    },
+    {
+        "element": "Ta (La)",
+        "value": 8.146
+    },
+    {
+        "element": "Ta (Ll)",
+        "value": 8.428
+    },
+    {
+        "element": "Ta (Lb)",
+        "value": 9.343
+    },
+    {
+        "element": "Ta (Lgamma)",
+        "value": 10.895
+    },
+    {
+        "element": "Ta (Ma)",
+        "value": 1.712
+    },
+    {
+        "element": "Ta (Mb)",
+        "value": 1.770
+    },
+    {
+        "element": "W (Ka)",
+        "value": 59.318
+    },
+    {
+        "element": "W (Kb)",
+        "value": 67.244
+    },
+    {
+        "element": "W (Ll)",
+        "value": 7.387
+    },
+    {
+        "element": "W (La)",
+        "value": 8.652
+    },
+    {
+        "element": "W (Ln)",
+        "value": 8.724
+    },
+    {
+        "element": "W (Lb)",
+        "value": 9.672
+    },
+    {
+        "element": "W (Lgamma)",
+        "value": 11.285
+    },
+    {
+        "element": "W (Ma)",
+        "value": 1.775
+    },
+    {
+        "element": "W (Mb)",
+        "value": 1.838
+    },
+    {
+        "element": "Re (Ka)",
+        "value": 61.141
+    },
+    {
+        "element": "Re (Kb)",
+        "value": 69.309
+    },
+    {
+        "element": "Re (Ll)",
+        "value": 7.604
+    },
+    {
+        "element": "Re (La)",
+        "value": 8.652
+    },
+    {
+        "element": "Re (Ln)",
+        "value": 9.027
+    },
+    {
+        "element": "Re (Lb)",
+        "value": 10.010
+    },
+    {
+        "element": "Re (Lgamma)",
+        "value": 11.685
+    },
+    {
+        "element": "Re (Ma)",
+        "value": 1.843
+    },
+    {
+        "element": "Re (Mb)",
+        "value": 1.906
+    },
+    {
+        "element": "Os (Ka)",
+        "value": 63.000
+    },
+    {
+        "element": "Os (Kb)",
+        "value": 71.414
+    },
+    {
+        "element": "Os (Ll)",
+        "value": 7.882
+    },
+    {
+        "element": "Os (La)",
+        "value": 8.911
+    },
+    {
+        "element": "Os (Ln)",
+        "value": 9.337
+    },
+    {
+        "element": "Os (Lb)",
+        "value": 10.354
+    },
+    {
+        "element": "Os (Lgamma)",
+        "value": 12.096
+    },
+    {
+        "element": "Os (Ma)",
+        "value": 1.907
+    },
+    {
+        "element": "Os (Mb)",
+        "value": 1.978
+    },
+    {
+        "element": "Ir (Ka)",
+        "value": 64.896
+    },
+    {
+        "element": "Ir (Kb)",
+        "value": 73.560
+    },
+    {
+        "element": "Ir (Ll)",
+        "value": 8.042
+    },
+    {
+        "element": "Ir (La)",
+        "value": 9.175
+    },
+    {
+        "element": "Ir (Ln)",
+        "value": 9.650
+    },
+    {
+        "element": "Ir (Lb)",
+        "value": 10.708
+    },
+    {
+        "element": "Ir (Lgamma)",
+        "value": 12.513
+    },
+    {
+        "element": "Ir (Ma)",
+        "value": 1.980
+    },
+    {
+        "element": "Ir (Mb)",
+        "value": 2.052
+    },
+    {
+        "element": "Pt (Ka)",
+        "value": 66.831
+    },
+    {
+        "element": "Pt (Ll)",
+        "value": 8.266
+    },
+    {
+        "element": "Pt (Kb)",
+        "value": 75.750
+    },
+    {
+        "element": "Pt (La)",
+        "value": 9.442
+    },
+    {
+        "element": "Pt (Ln)",
+        "value": 9.975
+    },
+    {
+        "element": "Pt (Lb)",
+        "value": 11.071
+    },
+    {
+        "element": "Pt (Lgamma)",
+        "value": 12.942
+    },
+    {
+        "element": "Pt (Ma)",
+        "value": 2.050
+    },
+    {
+        "element": "Pt (Mb)",
+        "value": 2.127
+    },
+    {
+        "element": "Au (Ka)",
+        "value": 68.806
+    },
+    {
+        "element": "Au (Kb)",
+        "value": 77.982
+    },
+    {
+        "element": "Au (Ll)",
+        "value": 8.494
+    },
+    {
+        "element": "Au (La)",
+        "value": 9.713
+    },
+    {
+        "element": "Au (Ln)",
+        "value": 10.309
+    },
+    {
+        "element": "Au (Lb)",
+        "value": 11.443
+    },
+    {
+        "element": "Au (Lgamma)",
+        "value": 13.382 
+    },
+    {
+        "element": "Au (Ma)",
+        "value": 2.123
+    },
+    {
+        "element": "Au (Mb)",
+        "value": 2.203
+    },
+    {
+        "element": "Hg (Ka)",
+        "value": 70.818
+    },
+    {
+        "element": "Hg (Kb)",
+        "value": 80.255
+    },
+    {
+        "element": "Hg (Ll)",
+        "value": 8.722
+    },
+    {
+        "element": "Hg (La)",
+        "value": 9.989
+    },
+    {
+        "element": "Hg (Ln)",
+        "value": 10.647
+    },
+    {
+        "element": "Hg (Lb)",
+        "value": 11.824
+    },
+    {
+        "element": "Hg (Lgamma)",
+        "value": 13.830 
+    },
+    {
+        "element": "Hg (Ma)",
+        "value": 2.195
+    },
+    {
+        "element": "Hg (Mb)",
+        "value": 2.281
+    },
+    {
+        "element": "Tl (Ka)",
+        "value": 72.872
+    },
+    {
+        "element": "Tl (Kb)",
+        "value": 82.573
+    },
+    {
+        "element": "Tl (Ll)",
+        "value": 8.953
+    },
+    {
+        "element": "Tl (La)",
+        "value": 10.269
+    },
+    {
+        "element": "Tl (Ln)",
+        "value": 10.994
+    },
+    {
+        "element": "Tl (Lb)",
+        "value": 12.213
+    },
+    {
+        "element": "Tl (Lgamma)",
+        "value": 14.291 
+    },
+    {
+        "element": "Tl (Ma)",
+        "value": 2.271
+    },
+    {
+        "element": "Tl (Mb)",
+        "value": 2.363
+    },
+    {
+        "element": "Pb (Ka)",
+        "value": 74.970
+    },
+    {
+        "element": "Pb (Kb)",
+        "value": 84.939
+    },
+    {
+        "element": "Pb (Ll)",
+        "value": 9.184
+    },
+    {
+        "element": "Pb (La)",
+        "value": 10.551
+    },
+    {
+        "element": "Pb (Ln)",
+        "value": 11.349
+    },
+    {
+        "element": "Pb (Lb)",
+        "value": 12.614
+    },
+    {
+        "element": "Pb (Lgamma)",
+        "value": 14.765 
+    },
+    {
+        "element": "Pb (Ma)",
+        "value": 2.342
+    },
+    {
+        "element": "Pb (Mb)",
+        "value": 2.444
+    },
+    {
+        "element": "Bi (Ka)",
+        "value": 77.107
+    },
+    {
+        "element": "Bi (Kb)",
+        "value": 87.349
+    },
+    {
+        "element": "Bi (Ll)",
+        "value": 9.420
+    },
+    {
+        "element": "Bi (La)",
+        "value": 10.839
+    },
+    {
+        "element": "Bi (Ln)",
+        "value": 11.712
+    },
+    {
+        "element": "Bi (Lb)",
+        "value": 13.023
+    },
+    {
+        "element": "Bi (Lgamma)",
+        "value": 15.247 
+    },
+    {
+        "element": "Bi (Ma)",
+        "value": 2.423
+    },
+    {
+        "element": "Bi (Mb)",
+        "value": 2.526
+    },
+    {
+        "element": "U (Ka)",
+        "value": 98.440
+    },
+    {
+        "element": "U (Kb)",
+        "value": 111.303
+    },
+    {
+        "element": "U (Ll)",
+        "value": 11.618
+    },
+    {
+        "element": "U (La)",
+        "value": 13.614
+    },
+    {
+        "element": "U (Ln)",
+        "value": 15.400
+    },
+    {
+        "element": "U (Lb)",
+        "value": 17.220
+    },
+    {
+        "element": "U (Lgamma)",
+        "value": 20.167 
+    },
+    {
+        "element": "U (Ma)",
+        "value": 3.171
+    },
+    {
+        "element": "U (Mb)",
+        "value": 3.336
+    }
+]
