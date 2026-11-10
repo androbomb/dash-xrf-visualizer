@@ -1,9 +1,9 @@
 # Operational plan — XRF-only visualizer (Dash / Jupyter / JAX)
 
 > **Status:** user-approved *target requirements*, NOT verified repository behavior.
-> **Current milestone:** M0, a READ-ONLY audit; no implementation or package installation.
+> **Current milestone:** M1 (baseline + approved docs), completed 2026-11-10 after M0 approval.
 > **Repository path seen by Hermes:** `/workspace/exchange/dash-xrf-visualizer`.
-> Any facts about the old program, data schemas, dependencies, and tested deploy targets remain `TBD` until inspected. The decisions explicitly fixed below must not be reopened unnecessarily.
+> M0 (read-only audit, 2026-11-10) verified the legacy code and the user-supplied example data; findings are recorded in `scientific_notes.md` and `timeline.md`. The decisions explicitly fixed below must not be reopened unnecessarily.
 
 ## 1. Scope: decisions already made
 
@@ -11,13 +11,13 @@ The deliverable is **an XRF-only data visualizer**, NOT a machine-learning appli
 
 | Feature | Target decision | Notes / questions for M0 |
 | --- | --- | --- |
-| HDF5 XRF input | **KEEP** | Discover actual groups, datasets, calibration and axis order. |
-| `.npz` input | **ADD** | Define supported key names, shapes and metadata contract; do not guess. |
-| `.npy` input | **ADD** | Contains an array but generally no calibration metadata: determine how energy coordinates are supplied, or label channels. |
+| HDF5 XRF input | **KEEP** | M0: legacy reads dataset/key `img`, shape (H,W,C); no per-file calibration in the main path. |
+| `.npz` input | **ADD** | M0: already supported in legacy (key `img`). New contract: `img` + optional `energy` float64 vector (keV) — approved 2026-11-10. |
+| `.npy` input | **ADD** | M0: absent in legacy. Contract: channel (ADC) axis only, no implicit keV; manual m/q calibration in UI — approved 2026-11-10. |
 | Left panel: XRF image | **KEEP** | Derive 2-D intensity image from user-selected spectral interval. |
 | Right panel: XRF spectrum | **KEEP** | Display spectrum for current spatial region (initially full field). |
 | Spectral interval / energy ROI | **KEEP** | Changing interval recomputes the elemental/intensity map. Respect legacy bin/energy semantics. |
-| Spatial ROI selection/zoom | **KEEP** | Changing image ROI recomputes the spectrum. Define selection mechanics and reset behavior. |
+| Spatial ROI selection/zoom | **KEEP** | Approved 2026-11-10: image zoom → new spectrum, spectrum zoom → new map (legacy semantics), plus explicit selection modes (drag select, numeric panel, multi-point) in M4; `autorange` = reset. |
 | AIRES and all model/inference UI/code | **REMOVE** | Explicit user decision; preserve legacy baseline/evidence first. No need to ask again if a component is unambiguously AIRES-only. |
 | Legacy custom-file reader | **DEFER** | Record findings; do not port now unless necessary for retained formats. |
 | Everything else | **EVALUATE** | Classify only unknown/ambiguous functionality. |
@@ -29,7 +29,7 @@ The provided example XRF file may be inspected only via lightweight metadata or 
 - Load a path supplied as a Python variable in a Jupyter notebook: `path_to_file = "/path/to/file"`. No hardcoded input paths or CLI-only workflow.
 - Render a **left image panel** and a **right spectral panel**. Preserve axes, labels, units, and metadata as discoverable.
 - A selected spectral interval updates the spatial map via a scientifically correct reduction/integration along the spectral axis.
-- A selected spatial region updates the spectrum via a scientifically correct reduction over the selected pixels. Image zoom is not automatically a change in ROI: preserve or explicitly define which user gesture changes data selection.
+- A selected spatial region updates the spectrum via a scientifically correct reduction over the selected pixels. **Zoom is selection** (approved 2026-11-10, legacy semantics): zooming the image recomputes the spectrum for the zoomed region; zooming the spectrum recomputes the map for the zoomed interval. Explicit selection modes (drag-mode select, numeric input panel, multi-point list) are additive in M4; `autorange`/double-click resets to the full field/interval.
 - Initial full-field/full-spectrum selection, empty ROIs, zero counts, NaNs, nonuniform energy grids, and repeated selections must be handled deterministically.
 - Distinguish **sum of counts** over energy channels from **integral with energy-bin widths**; use the legacy convention or a documented, approved scientific choice. Avoid silent conversion between channel and energy units.
 
@@ -98,12 +98,13 @@ Tree is an understandable **proposal**, not an instruction to create empty files
 - Use `jax.numpy` in retained numerical kernels **where it adds value**; use h5py, NumPy, and Plotly interoperability where required. No PyTorch as a retained dependency unless an explicitly retained function actually needs it (expected: none after removing AIRES).
 - Detect the backend **visible to JAX from the running notebook kernel**. Prefer a supported GPU if accessible; otherwise CPU, and report the selected device. Do not equate host `nvidia-smi` with a working JAX GPU backend.
 - Avoid silent fallback on a broken backend initialization. Surface meaningful diagnostics; document CPU-only and GPU installation paths separately, with compatible versions rather than a speculative universal command.
+- **M1 verified (2026-11-10):** the default environment installs CPU-only JAX (no CUDA plugin); `import jax; jax.devices()` created no CUDA context and pre-allocated no VRAM (`nvidia-smi` before/after on an RTX 5070 Ti host). GPU is an opt-in documented variant (`jax[cuda12]`) in `deploy/uv/README.md` (NOT TESTED). Reductions always accumulate in float64 (example data is float32).
 - Compare retained legacy calculations with small reproducible references. Record precision (`float32` / `float64`, `jax_enable_x64`), tolerances, count overflow, axes, binning, NaN handling and CPU/GPU agreement. Avoid repeated recompilation caused by changing shapes.
 - Interactive callbacks must not read arbitrary files, trigger expensive compilation, or move large cubes CPU↔GPU without an explicit design.
 
 ### 3.3 Dash / Notebook
 
-- Use supported built-in Dash-in-Jupyter mode (on a verified compatible Dash version); avoid deprecated `JupyterDash` unless there is a specific compatibility necessity.
+- Use supported built-in Dash-in-Jupyter mode (on a verified compatible Dash version); avoid deprecated `JupyterDash` unless there is a specific compatibility necessity. **M1 verified (2026-11-10):** `app.run(jupyter_mode=...)` is present in dash 4.5.0 in the project venv.
 - The notebook starts with `path_to_file = "/path/to/file"`, creates app with a clean factory, then displays it inline. Package import must have no filesystem, server-start or GPU-compile side effect.
 - Handle kernel reruns, duplicate callback registrations, port collisions, local bind address, and reverse proxies/container network mapping as appropriate. Do not assume Jupyter runs on the host; paths must resolve inside the kernel environment.
 
@@ -115,7 +116,7 @@ Tree is an understandable **proposal**, not an instruction to create empty files
 - Hermes does not have Docker, WSLC or Apptainer available for this project: write/read-review recipes after approval and mark **NOT TESTED**. The user performs runtime validation and provides feedback. Do not run them in M0.
 - Hermes may use `uv` for environment creation and kernel registration **after M0 and explicit authorization**, not during the read-only audit.
 
-## 4. M0 audit (only authorized current work)
+## 4. M0 audit (completed 2026-11-10 — findings in `scientific_notes.md` and `timeline.md`)
 
 1. Check repository path `/workspace/exchange/dash-xrf-visualizer` and `git status`. Stop if absent; do not search elsewhere by guessing.
 2. Map original Dash entrypoints, callbacks, data readers, visualization pipeline, AIRES dependencies, custom readers, existing tests and documented runtime requirements. Treat `dash-xrf-analyzer/` as read-only reference.
@@ -143,8 +144,8 @@ Tree is an understandable **proposal**, not an instruction to create empty files
 
 | Milestone | Output | Gate |
 | --- | --- | --- |
-| **M0 — READ-ONLY** | Evidence report: existing code, formats, feature mapping, risks, precise M1 proposal | Stop for approval |
-| **M1 — Baseline + approved docs** | Representative small fixture, known XRF arithmetic results, coordinated docs plan | Approval for bounded tests/edits |
+| **M0 — READ-ONLY** ✅ 2026-11-10 | Evidence report: existing code, formats, feature mapping, risks, precise M1 proposal | Approved 2026-11-10 |
+| **M1 — Baseline + approved docs** ✅ 2026-11-10 | Representative small fixture, known XRF arithmetic results, coordinated docs plan | Approved 2026-11-10 |
 | **M2 — Readers + source package** | HDF5 / NumPy readers, `src/` layout, minimal `tests/`, uv packaging | Test schemas and no AIRES coupling |
 | **M3 — JAX + ROI reductions** | GPU-aware device policy, validated spectrum/map algorithms | CPU correctness before speed |
 | **M4 — Dash / Jupyter** | Clear layout/callback split, root example notebook, interactive ROI | Verify notebook behavior |

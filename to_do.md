@@ -1,35 +1,40 @@
 # XRF-only visualizer — project to-do
 
-> Future requirements are user decisions, not verified legacy implementation. **M0 is read-only**.
+> Future requirements are user decisions, not verified legacy implementation.
+> M0 completed 2026-11-10; M1 completed 2026-11-10.
 
-## Now — M0 audit, report only
+## Now — M1 baseline + approved docs (completed 2026-11-10)
 
-- [ ] Verify `/workspace/exchange/dash-xrf-visualizer` exists and inspect `git status`.
-- [ ] Inventory old Dash entrypoints, callbacks, image/spectrum calculation, energy and spatial ROI UI, format readers, and any code relying on `dash-xrf-analyzer/`.
-- [ ] Identify AIRES-specific imports/callbacks/UI/code and propose removal boundaries; no need to re-ask whether AIRES stays (it does not).
-- [ ] Inspect HDF5 and any permitted example file using metadata and bounded slices; record actual axis layout, energy calibration and data types.
-- [ ] Inventory `.npz` / `.npy` support and determine the minimal new data contract, including external energy metadata if needed.
-- [ ] Report which parts can be reused in proposed `src/`, `tests/`, `deploy/` structure and whether `dash-xrf-analyzer/` is tracked by Git.
-- [ ] Propose M1 with small baseline fixture, feature/algorithm parity tests and a minimal edit set. **STOP for approval.**
+- [x] uv project at root: `pyproject.toml`, `uv.lock`, `.python-version` (3.12); CPU-only JAX default (no GPU pre-allocation — verified with `nvidia-smi`).
+- [x] Deterministic synthetic fixture (48×64×512 float32) as .npz/.h5/.npy + `golden.json`; generator `tests/make_fixture.py`.
+- [x] Baseline tests: golden reductions (float64 rule), interval/ROI edge cases, encoding consistency — 5 passed in <1 s.
+- [x] Docs sync: `scientific_notes.md` (verified conventions), `operational_plan.md` (M0 findings), this file, `timeline.md`, `AGENTS.md`, real `README.md` (bootstrap removed).
+- [x] Jupyter kernel registered from the project venv (`xrf-viz`); instructions in `deploy/uv/README.md`.
+- [ ] Gate: user review of M1 → approve M2.
 
-## Next — requires authorization after M0
+## Next — M2: readers + source package (requires approval)
 
-- [ ] Document known reference values for spectral integration and spatial ROI summation/aggregation.
-- [ ] Create root uv packaging and importable source layout; migrate HDF5 reader and add `.npz` / `.npy` with validated schemas.
-- [ ] Implement and validate JAX numerical reductions with explicit CPU/GPU reporting and dtype decisions.
-- [ ] Split Dash UI layout, callbacks and plot construction; provide `example.ipynb` with `path_to_file`.
-- [ ] Remove AIRES runtime code/dependencies and update actual human README.
+- [ ] `src/xrf_visualizer/data/`: readers for `.h5` (key `img`), `.npz` (`img` + optional `energy`), `.npy` (channel axis only); schema validation (ndim=3, dtype, shape) with informative errors; readers never import Dash.
+- [ ] Migrate `XRFlines.json` (347 CHNet lines, legacy `application/static/`) into the package as static data.
+- [ ] `tests/test_readers.py`: fixture round-trips + schema validation + bounded metadata check of `data_example/` files.
+- [ ] Gate: reader tests green, no AIRES coupling.
+
+## After M2 (approval-gated)
+
+- [ ] M3 — `processing/`: `backend.py` (device policy: CPU default, explicit GPU opt-in) + `reductions.py` (map/ROI, keV↔channel via m/q, float64 rule); JAX parity vs `golden.json` (exact); GPU agreement test marked NOT TESTED until the user runs it.
+- [ ] M4 — `ui/`: left image + right spectrum; zoom = selection (image zoom → spectrum, spectrum zoom → map); explicit selection: drag-mode select, numeric panel (x0,x1,y0,y1), multi-point; zmin/zmax, colorscale, lin/log; manual m/q calibration panel; `example.ipynb` with `path_to_file`.
+- [ ] M5 — AIRES/TF absence gate (grep), `deploy/{docker,wslc,apptainer}/` recipes marked NOT TESTED, final README pass.
 
 ## Later — not executable in Hermes' current environment
 
-- [ ] Write `deploy/docker/` (Dockerfile/Compose), `deploy/wslc/` (Containerfile), `deploy/apptainer/` (`.def`) and `deploy/uv/` notebook-kernel instructions.
 - [ ] Ask user to manually test Docker, WSLC and Apptainer; document real test results (do not claim they passed).
+- [ ] GPU validation on the user's WSL2 (RTX 5070 Ti / sm_120, cu12): `jax[cuda12]` variant + VRAM behavior with the documented XLA flags.
 - [ ] Review removal of legacy `dash-xrf-analyzer/` **only after explicit final user approval**.
 
-## Open technical questions (not feature-retention decisions)
+## Resolved (2026-11-10, user decisions)
 
-- HDF5 group/key schema, dimension order, calibration units and spectral sampling.
-- What `.npz` key schema and `.npy` metadata/energy-axis input are acceptable?
-- Exact integration rule for elemental/intensity images and spatial ROI aggregation.
-- ROI interaction: zoom versus selection, selectable shapes, default and reset behavior.
-- Which user environment(s) will validate GPU, containers, notebook port/proxy access?
+- Data schema: legacy `img` key, (H, W, C); examples float32, C=500, no stored energy axis → channel axis by default, manual `E(i) = m·i + q` calibration in UI.
+- Integration/aggregation: plain sums, no normalization (map over channels, spectrum over pixels).
+- ROI interaction: zoom = selection (legacy semantics) + drag select + numeric panel + multi-point.
+- `.npz` may carry an optional `energy` vector; `.npy` channel axis only.
+- AIRES / model / inference / segmentation UI: removed (not re-asked). Custom raw reader: DEFER.
