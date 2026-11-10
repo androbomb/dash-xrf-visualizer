@@ -1,6 +1,6 @@
 # Project agent rules — XRF-only Dash / Jupyter / JAX refactor
 
-These rules apply to Hermes and any other agent working in the XRF visualizer repository. Prioritize scientific correctness, readable maintainable Python, resource limits, reproducibility and user-authorized scope over speed. **Current work authorization is M0 read-only only.** `operational_plan.md` is the single source of truth for exact feature decisions and the proposed layout. Do not claim the legacy repository has been audited.
+These rules apply to Hermes and any other agent working in the XRF visualizer repository. Prioritize scientific correctness, readable maintainable Python, resource limits, reproducibility and user-authorized scope over speed. **M0 audit completed 2026-11-10 (read-only); current authorization: M1 — uv environment, baseline fixture/tests, docs sync, kernel registration.** `operational_plan.md` is the single source of truth for exact feature decisions and the proposed layout. The legacy repository was audited read-only during M0; findings are in `scientific_notes.md` and `timeline.md`.
 
 ## Project snapshot — user requirements (not yet observed code)
 
