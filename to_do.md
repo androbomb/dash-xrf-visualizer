@@ -1,7 +1,7 @@
 # XRF-only visualizer — project to-do
 
 > Future requirements are user decisions, not verified legacy implementation.
-> M0, M1, M2 and M3 completed 2026-11-10.
+> M0, M1, M2 and M3 completed 2026-11-10; M4 completed 2026-11-11.
 
 ## Now — M1 baseline + approved docs (completed 2026-11-10)
 
@@ -22,7 +22,7 @@
 ## After M3 (approval-gated)
 
 - [x] M3 — `processing/`: `backend.py` (x64 forced, native JAX device policy: CPU in this venv, GPU via `JAX_PLATFORM_NAME`, `backend_info`/`require_backend`) + `reductions.py` (`map_from_channels`, `spectrum_from_roi`, `spectrum_from_points`, `calibrate`, `energy_to_channel`, `channel_range_for_energy`; out-of-range raises ValueError); JAX parity vs `golden.json` **bit-exact** on all 7 keys; GPU agreement test marked NOT TESTED (skips here).
-- [ ] M4 — `ui/`: left image + right spectrum; zoom = selection (image zoom → spectrum, spectrum zoom → map); explicit selection: drag-mode select, numeric panel (x0,x1,y0,y1), multi-point; zmin/zmax, colorscale, lin/log; manual m/q calibration panel; `example.ipynb` with `path_to_file`.
+- [x] M4 — `ui/`: map left + spectrum right; zoom = selection via `relayoutData` (image zoom → spectrum, spectrum zoom → map, autorange = reset); explicit selection: numeric ROI panel, multi-point (rows/cols), numeric channel interval; zmin/zmax, colorscale, log; manual m/q calibration (keV axis when m set, else ADC); `example.ipynb` with `path_to_file`. Evidence: 31 passed + 1 GPU skip; live-server E2E (real Mantegna cube): figures bit-exact vs `processing/`, zoom→ROI `[19,30,10,50]`, zoom→interval `[100,120]`, point validation + error msg. dash 4.5 note: callbacks must return a list of values even for a single Output.
 - [ ] M5 — AIRES/TF absence gate (grep), `deploy/{docker,wslc,apptainer}/` recipes marked NOT TESTED, final README pass.
 
 ## Later — not executable in Hermes' current environment

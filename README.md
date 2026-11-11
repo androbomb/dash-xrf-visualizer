@@ -13,9 +13,10 @@ parts were removed by decision; the custom CHNet raw reader is deferred.
 ## Status
 
 - M0 (read-only audit), M1 (uv environment, fixture + golden tests, docs),
-  M2 (readers, `XRFlines`) and M3 (JAX float64 reductions, bit-exact vs
-  goldens) completed 2026-11-10 — see `timeline.md`.
-- **Not implemented yet:** Dash UI (M4) and deployment recipes (M5).
+  M2 (readers, `XRFlines`), M3 (JAX float64 reductions, bit-exact vs
+  goldens) completed 2026-11-10; M4 (Dash UI) completed 2026-11-11 — see
+  `timeline.md`.
+- **Not implemented yet:** deployment recipes (M5, NOT TESTED).
   Scope and acceptance criteria: `operational_plan.md`; verified numerical
   conventions: `scientific_notes.md`.
 
@@ -23,7 +24,7 @@ parts were removed by decision; the custom CHNet raw reader is deferred.
 
 ```bash
 uv sync
-.venv/bin/python -m pytest -q          # 5 tests, ~1 s, CPU only
+.venv/bin/python -m pytest -q          # 31 passed + 1 GPU skip, ~18 s, CPU only
 .venv/bin/python -m ipykernel install --user --name xrf-viz \
     --display-name "Python 3.12 (xrf-viz)"
 ```
@@ -48,13 +49,21 @@ at import and no VRAM is pre-allocated (verified with `nvidia-smi` on a GPU
 host, 2026-11-10). GPU is an opt-in, NOT TESTED variant —
 `deploy/uv/README.md`.
 
-## Layout / interactions (target, M4)
+## Layout / interactions (M4, implemented 2026-11-11)
 
-- Left: 2-D map (`px.imshow`); zmin/zmax, colorscale, lin/log controls.
-- Right: spectrum (keV or channel vs counts) with rangeslider.
-- **Zoom = selection** (legacy semantics, confirmed by user): image zoom →
-  new spectrum; spectrum zoom → new map; `autorange` resets to full field.
-- Extra selection modes: drag-mode select, numeric ROI panel, multi-point.
+- Left: 2-D map (heatmap); zmin/zmax, colorscale, log controls.
+- Right: spectrum (keV axis when `m` is set, otherwise channel (ADC) vs
+  sum counts).
+- **Zoom = selection** (legacy semantics, via plotly `relayoutData`): image
+  zoom → new spectrum; spectrum zoom → new map; `autorange` resets to full
+  field. Pan emits the same ranges signal, so panning also moves the
+  selection (known limitation of the relayout-based design).
+- Explicit selection: numeric ROI panel (y0, y1, x0, x1), multi-point
+  (rows + cols), numeric channel interval. Manual calibration panel
+  (`m`, `q`); invalid points report an error message and keep the previous
+  selection. All selections are clamped before reaching `processing/`.
+- `example.ipynb`: set `path_to_file`, then `build_app(cube)` and
+  `app.run(jupyter_mode=True)`; `app.run()` also works from a terminal.
 
 ## Repository map
 
