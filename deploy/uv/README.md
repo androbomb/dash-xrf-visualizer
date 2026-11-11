@@ -12,6 +12,20 @@ uv sync                      # creates .venv/ (git-ignored) from uv.lock
     --display-name "Python 3.12 (xrf-viz)"
 ```
 
+On windows:
+```powershell
+# install if needed
+powershell -c "irm https://astral.sh/uv/install.ps1 | more"
+# allow
+Set-ExecutionPolicy -Scope Process -ExecutionPolicy RemoteSigned
+# activate
+.\.venv\Scripts\Activate.ps1
+# test
+python -m pytest -q
+# save kernel
+python -m ipykernel install --user --name xrf-viz --display-name "Python 3.12 (xrf-viz)"
+```
+
 In Jupyter/JupyterLab select the kernel **Python 3.12 (xrf-viz)**.
 
 ## Compute backend: CPU by default (verified), GPU opt-in (NOT TESTED)
