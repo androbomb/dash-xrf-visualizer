@@ -1,6 +1,6 @@
 # Operational plan — XRF-only visualizer (Dash / Jupyter / JAX)
 
-> **Status:** requirements implemented — M0–M5 completed 2026-11-10/11 (M3/M4/M5 evidence in `timeline.md`).
+> **Status:** requirements implemented — M0–M6 completed 2026-11-10/11 (M3–M6 evidence in `timeline.md`).
 > **Remaining:** user-side container tests, GPU validation, deferred items in Section 7.
 > **Repository path seen by Hermes:** `/workspace/exchange/dash-xrf-visualizer`.
 > M0 (read-only audit, 2026-11-10) verified the legacy code and the user-supplied example data; findings are recorded in `scientific_notes.md` and `timeline.md`. The decisions explicitly fixed below must not be reopened unnecessarily.
@@ -152,6 +152,7 @@ Tree is an understandable **proposal**, not an instruction to create empty files
 | **M3 — JAX + ROI reductions** ✅ 2026-11-10 | Device policy + float64 reductions, bit-exact vs goldens | CPU correctness before speed (24 passed, GPU skipped) |
 | **M4 — Dash / Jupyter** ✅ 2026-11-11 | `ui/app.py` (factory, figures, callbacks), root example notebook, zoom = selection + explicit panels | Server-level E2E bit-exact vs processing (31 passed, GPU skipped) |
 | **M5 — Cleanup + deploy docs** ✅ 2026-11-11 | AIRES/TF absence grep (0 hits), `deploy/{docker,wslc,apptainer}/` recipes **NOT TESTED**, final README | User tests unexecutable runtimes; no unapproved deletions |
+| **M6 — Empty start + file loading** ✅ 2026-11-11 | `build_app(None)`; upload (`.npz`/`.h5`/`.npy`) or http(s) link in the UI; `sniff_format`/`load_cube_bytes`/`download_cube`; `XRF_CUBE` optional in containers | 49 passed + 1 GPU skip; empty-app E2E bit-exact via HTTP (upload → map vs `map_from_channels`) |
 
 These are planning checkpoints, NOT evidence of work performed. Use small reversible commits only when the user authorizes writes; never push without explicit approval. Do not delete `dash-xrf-analyzer/` automatically.
 

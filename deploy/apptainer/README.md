@@ -7,7 +7,9 @@ docker build -t xrf-viz -f deploy/docker/Dockerfile .
 apptainer build xrf-viz.sif deploy/apptainer/xrf-viz.def
 ```
 
-Run (bind the data directory, point `XRF_CUBE` at the mounted file):
+Run (bind the data directory, point `XRF_CUBE` at the mounted file —
+**optional**, M6: without it the app starts empty and you upload a file or
+paste a download link in the UI):
 
 ```bash
 apptainer run --bind /abs/path/to/xrf/data:/data \

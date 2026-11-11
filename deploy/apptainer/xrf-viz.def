@@ -10,4 +10,5 @@ From: xrf-viz:latest
     Maintainer "androbomb"
 
 %runscript
-uv run python -c "import os; from xrf_visualizer.data import load_cube; from xrf_visualizer.ui import build_app; build_app(load_cube(os.environ.get('XRF_CUBE', '/data/cube.npz')).array).run(host='0.0.0.0', port=8765)"
+# XRF_CUBE optional (M6): unset -> app starts empty (upload/link in the UI).
+uv run python -c "import os; from xrf_visualizer.data import load_cube; from xrf_visualizer.ui import build_app; p = os.environ.get('XRF_CUBE') or None; build_app(load_cube(p).array if p else None).run(host='0.0.0.0', port=8765)"

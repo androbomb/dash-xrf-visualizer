@@ -6,14 +6,24 @@ the zoomed channel interval. autorange/reset = full field. Explicit
 selection: numeric ROI panel, multi-point list, numeric channel interval.
 All selections are clamped before reaching the processing layer, which
 raises ValueError on out-of-range input.
+
+M6 file loading: build_app(cube=None) starts empty. The user loads a cube
+via upload (.npz/.h5/.npy) or an http(s) link in the UI; "Change file"
+clears it. The current cube lives in a Python-side closure (``state``),
+never in a dash Store (too big for JSON round-trips). Selection stores may
+be stale after a new load; the processing layer clamps, and a ``gen`` store
+bump forces the figure callbacks to recompute.
 """
+import base64
 import re
+from pathlib import Path
 
 import numpy as np
 import plotly.express as px
 import plotly.graph_objects as go
 from dash import Dash, Input, Output, State, dcc, html, no_update
 
+from ..data import download_cube, load_cube_bytes
 from ..processing import (
     calibrate,
     map_from_channels,
@@ -123,13 +133,63 @@ def spectrum_figure(cube, roi=None, points=None, m=None, q=None):
 
 # ----------------------------------------------------------------------- app
 
-def build_app(cube):
-    """Dash app around a loaded (H, W, C) cube. Run with app.run(...) or
-    app.run(jupyter_mode=True) inside a notebook."""
-    H, W, C = cube.shape
+def _as_array(cube):
+    """Accept None, an ndarray, or an XrfCube (uses its .array)."""
+    if cube is None:
+        return None
+    if isinstance(cube, np.ndarray):
+        return cube
+    arr = getattr(cube, "array", None)
+    if arr is None:
+        raise TypeError(f"cube must be an XrfCube or ndarray, got {type(cube).__name__}")
+    return arr
+
+
+def _empty_figure(label):
+    fig = go.Figure()
+    fig.update_layout(
+        xaxis=dict(visible=False), yaxis=dict(visible=False),
+        annotations=[dict(text=label, showarrow=False, font=dict(size=18))],
+        margin=dict(l=10, r=10, t=30, b=10),
+    )
+    return fig
+
+
+def build_app(cube=None):
+    """Dash app for an XRF cube. Run with app.run(...) or
+    app.run(jupyter_mode=True) inside a notebook.
+
+    ``cube`` may be an XrfCube, a (H, W, C) ndarray, or None (M6: start
+    empty, load via upload or link in the UI).
+    """
+    arr = _as_array(cube)
+    state = {"cube": arr,
+             "name": Path(getattr(cube, "path", "") or "cube").name}
+    H, W, C = arr.shape if arr is not None else (0, 0, 0)
     app = Dash(__name__)
     app.layout = html.Div([
-        html.H3(f"XRF visualizer — {H} x {W} x {C}"),
+        html.Div([
+            html.H3("XRF visualizer", style={"display": "inline-block", "margin-right": 12}),
+            html.Span(id="cube-name",
+                      children=f"— {H} x {W} x {C}" if arr is not None else "— no cube loaded",
+                      style={"verticalAlign": "middle"}),
+            html.Button("Change file", id="change-file", n_clicks=0, style={"float": "right"}),
+        ]),
+        html.Div([
+            dcc.Upload(
+                id="upload",
+                children=html.Div("Upload .npz / .h5 / .npy (drag & drop or click)",
+                                  style={"display": "inline-block", "width": "40%",
+                                         "lineHeight": "50px", "border": "1px dashed #999",
+                                         "textAlign": "center"}),
+                multiple=False,
+            ),
+            dcc.Input(id="url", type="text",
+                      placeholder="https://… (share/download link: ownCloud, nextCloud, Zenodo, …)",
+                      style={"width": "45%"}),
+            html.Button("Load from link", id="load-url", n_clicks=0),
+        ]),
+        html.Div(id="load-msg", style={"color": "darkred"}),
         html.Div([
             html.Div(dcc.Graph(id="map", style={"height": "60vh"}),
                      style={"width": "60%", "display": "inline-block"}),
@@ -167,22 +227,39 @@ def build_app(cube):
         dcc.Store(id="roi-store", data=[0, H, 0, W]),
         dcc.Store(id="ch-store", data=[0, C]),
         dcc.Store(id="points-store", data=[]),
+        dcc.Store(id="gen", data=0),
     ])
 
     @app.callback(Output("map", "figure"),
                   Input("ch-store", "data"),
                   Input("zmin", "value"), Input("zmax", "value"),
-                  Input("colorscale", "value"), Input("log", "value"))
-    def _map_figure(ch, zmin, zmax, cscale, log):
+                  Input("colorscale", "value"), Input("log", "value"),
+                  Input("gen", "data"))
+    def _map_figure(ch, zmin, zmax, cscale, log, _gen):
+        c = state["cube"]
+        if c is None:
+            return [_empty_figure("No cube loaded — upload a file or paste a link above")]
         s, e = ch
+        if e is None or e <= (s or 0):  # stale/empty interval -> full channels
+            s, e = 0, c.shape[2]
         # dash 4: callbacks return a list of values, even for a single Output
-        return [map_figure(cube, s, e, zmin, zmax, cscale, bool(log))]
+        return [map_figure(c, s, e, zmin, zmax, cscale, bool(log))]
 
     @app.callback(Output("spectrum", "figure"),
                   Input("roi-store", "data"), Input("points-store", "data"),
-                  Input("m", "value"), Input("q", "value"))
-    def _spec_figure(roi, pts, m, q):
-        return [spectrum_figure(cube, roi=roi, points=pts, m=m, q=q)]
+                  Input("m", "value"), Input("q", "value"),
+                  Input("gen", "data"))
+    def _spec_figure(roi, pts, m, q, _gen):
+        c = state["cube"]
+        if c is None:
+            return [_empty_figure("No cube loaded")]
+        H, W, _ = c.shape
+        if pts:  # drop points stale from a previous cube; all stale -> ROI
+            keep = [p for p in pts if 0 <= p[0] < H and 0 <= p[1] < W]
+            pts = keep or None
+        if roi and roi[1] <= roi[0] and roi[3] <= roi[2]:  # degenerate ROI -> full frame
+            roi = None
+        return [spectrum_figure(c, roi=roi, points=pts, m=m, q=q)]
 
     @app.callback(Output("roi-store", "data"),
                   Input("map", "relayoutData"), Input("apply-roi", "n_clicks"),
@@ -191,6 +268,10 @@ def build_app(cube):
                   State("roi-x0", "value"), State("roi-x1", "value"),
                   prevent_initial_call=True)
     def _set_roi(rl, n, cur, y0, y1, x0, x1):
+        c = state["cube"]
+        if c is None:
+            return [cur]
+        H, W, _ = c.shape
         if rl:
             r = _roi_from_relayout(rl, H, W)
             if r is not None:
@@ -205,6 +286,10 @@ def build_app(cube):
                   State("ch-s", "value"), State("ch-e", "value"),
                   prevent_initial_call=True)
     def _set_ch(rl, n, cur, s, e):
+        c = state["cube"]
+        if c is None:
+            return [cur]
+        C = c.shape[2]
         if rl:
             r = _ch_from_relayout(rl, C)
             if r is not None:
@@ -220,15 +305,60 @@ def build_app(cube):
                   State("pt-rows", "value"), State("pt-cols", "value"),
                   prevent_initial_call=True)
     def _set_points(n_pt, n_cl, rows_s, cols_s):
+        c = state["cube"]
         if n_cl:
             return [], ""
+        if c is None:
+            return no_update, "Load a cube first (upload or link)"
+        H, W, _ = c.shape
         try:
-            pts = [[r, c] for r, c in _parse_points(rows_s, cols_s)]
+            pts = [[r, c_] for r, c_ in _parse_points(rows_s, cols_s)]
             bad = [p for p in pts if not (0 <= p[0] < H and 0 <= p[1] < W)]
             if bad:
                 raise ValueError(f"point {bad[0]} out of bounds ({H}x{W})")
             return pts, ""
         except ValueError as e:
             return no_update, str(e)
+
+    # --- M6: file loading (upload / link / change) ---------------------------
+    @app.callback([Output("load-msg", "children"), Output("cube-name", "children"),
+                   Output("zmin", "value"), Output("zmax", "value"),
+                   Output("gen", "data")],
+                  Input("upload", "contents"), State("upload", "filename"),
+                  Input("load-url", "n_clicks"), State("url", "value"),
+                  Input("change-file", "n_clicks"),
+                  State("gen", "data"),
+                  prevent_initial_call=True)
+    def _on_load(contents, filename, n_url, url, n_change, gen):
+        """Single entry point for file loading (M6). Priority: change > link >
+        upload. On error the cube state is untouched. The gen bump forces the
+        figure callbacks to recompute (selection stores may be stale)."""
+        if n_change:
+            state["cube"], state["name"] = None, ""
+            return ("Cube cleared — upload a file or paste a link.",
+                    "— no cube loaded", None, None, (gen or 0) + 1)
+        if n_url and url and url.strip():
+            try:
+                cube = download_cube(url.strip())
+            except Exception as e:
+                return f"Download failed: {e}", no_update, no_update, no_update, no_update
+            state["cube"], state["name"] = cube.array, cube.path.name
+            h, w, c_ = cube.array.shape
+            return (f"Loaded {cube.path.name} — {h} x {w} x {c_}",
+                    f"— {cube.path.name} ({h} x {w} x {c_})",
+                    None, None, (gen or 0) + 1)
+        if contents:
+            try:
+                _, b64 = contents.split(",", 1)
+                data = base64.b64decode(b64)
+                cube = load_cube_bytes(data, filename or "")
+            except Exception as e:
+                return f"Upload failed: {e}", no_update, no_update, no_update, no_update
+            state["cube"], state["name"] = cube.array, Path(filename or "cube").name
+            h, w, c_ = cube.array.shape
+            return (f"Loaded {state['name']} — {h} x {w} x {c_}",
+                    f"— {state['name']} ({h} x {w} x {c_})",
+                    None, None, (gen or 0) + 1)
+        return no_update, no_update, no_update, no_update, no_update
 
     return app

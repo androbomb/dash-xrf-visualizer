@@ -8,7 +8,8 @@ Build (context = repository root):
 wslc build --tag xrf-viz --file deploy/wslc/Containerfile .
 ```
 
-Run:
+Run (`XRF_CUBE` **optional**, M6 — without it the app starts empty and
+you upload a file or paste a download link in the UI):
 
 ```bash
 wslc run --port 8765:8765 \

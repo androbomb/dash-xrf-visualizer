@@ -17,13 +17,20 @@ differs, check `wslc build --help` / `wslc run --help`.
    wslc build --tag xrf-viz --file deploy/wslc/Containerfile .
    ```
 
-2. Run (adjust the path and cube filename):
+2. Run — with a preloaded cube (adjust the path and cube filename):
 
    ```bash
    wslc run --port 8765:8765 \
        --volume /home/<you>/xrf-data:/data:ro \
        --environment XRF_CUBE=/data/Mantegna_mappa3b_centro-sx_35kV-90uA.npz \
        xrf-viz
+   ```
+
+   Or empty (M6 — no env, no volume): the app starts with "no cube
+   loaded" and you upload a file or paste a download link in the UI:
+
+   ```bash
+   wslc run --port 8765:8765 xrf-viz
    ```
 
 3. Open `http://localhost:8765`. First request compiles the JAX reductions —
@@ -44,6 +51,7 @@ differs, check `wslc build --help` / `wslc run --help`.
 
 - [ ] Build succeeds.
 - [ ] Page loads at `http://localhost:8765` (map left, spectrum right).
+- [ ] Empty start (no `XRF_CUBE`) → upload a `.npz`/`.h5`/`.npy` (or paste a link) → map and spectrum appear (M6).
 - [ ] Zoom the map → spectrum updates; zoom the spectrum → map updates.
 - [ ] `autorange` resets to full field/interval.
 - [ ] Numeric ROI panel and multi-point panels work (error msg on bad input).

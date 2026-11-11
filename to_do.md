@@ -1,7 +1,7 @@
 # XRF-only visualizer — project to-do
 
 > Future requirements are user decisions, not verified legacy implementation.
-> M0, M1, M2 and M3 completed 2026-11-10; M4 completed 2026-11-11.
+> M0–M6 completed 2026-11-10/11 (evidence in `timeline.md`).
 
 ## Now — M1 baseline + approved docs (completed 2026-11-10)
 
@@ -24,6 +24,7 @@
 - [x] M3 — `processing/`: `backend.py` (x64 forced, native JAX device policy: CPU in this venv, GPU via `JAX_PLATFORM_NAME`, `backend_info`/`require_backend`) + `reductions.py` (`map_from_channels`, `spectrum_from_roi`, `spectrum_from_points`, `calibrate`, `energy_to_channel`, `channel_range_for_energy`; out-of-range raises ValueError); JAX parity vs `golden.json` **bit-exact** on all 7 keys; GPU agreement test marked NOT TESTED (skips here).
 - [x] M4 — `ui/`: map left + spectrum right; zoom = selection via `relayoutData` (image zoom → spectrum, spectrum zoom → map, autorange = reset); explicit selection: numeric ROI panel, multi-point (rows/cols), numeric channel interval; zmin/zmax, colorscale, log; manual m/q calibration (keV axis when m set, else ADC); `example.ipynb` with `path_to_file`. Evidence: 31 passed + 1 GPU skip; live-server E2E (real Mantegna cube): figures bit-exact vs `processing/`, zoom→ROI `[19,30,10,50]`, zoom→interval `[100,120]`, point validation + error msg. dash 4.5 note: callbacks must return a list of values even for a single Output.
 - [x] M5 — AIRES/TF absence gate: `grep -ri "aires|tensorflow|keras" src/ pyproject.toml` → 0 hits; `deploy/docker/` (Dockerfile + README), `deploy/wslc/` (Containerfile + README), `deploy/apptainer/` (xrf-viz.def + README) all marked NOT TESTED (CPU-only JAX image, `XRF_CUBE` env + `/data` bind, port 8765); final README pass.
+- [x] M6 — Empty start + file loading: `build_app(cube=None)`; upload (`.npz`/`.h5`/`.npy`) or http(s) link in the UI (500 MB cap, magic-byte sniffing); `sniff_format`/`load_cube_bytes`/`download_cube` in `data/`; `XRF_CUBE` now optional in all containers (empty app when unset); markdown synced (README, how_to_deploy_*, container READMEs, plan, timeline). Evidence: 49 passed + 1 GPU skip; empty-app E2E over HTTP (upload → map bit-exact vs `map_from_channels`, bad link → clear error + state untouched, change-file → cleared).
 
 ## Later — not executable in Hermes' current environment
 

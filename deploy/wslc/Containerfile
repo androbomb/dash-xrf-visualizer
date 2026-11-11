@@ -7,7 +7,8 @@ RUN uv sync --frozen --no-dev
 COPY src/ ./src/
 COPY tests/ ./tests/
 
-# Cube path, bind-mount the data dir read-only at /data.
-ENV XRF_CUBE=/data/cube.npz
+# Cube path is optional (M6): with XRF_CUBE set the cube loads at startup,
+# otherwise the app starts empty and the user uploads a file or pastes a
+# link in the UI. Bind-mount the data dir read-only at /data when using it.
 EXPOSE 8765
-CMD ["uv", "run", "python", "-c", "import os; from xrf_visualizer.data import load_cube; from xrf_visualizer.ui import build_app; build_app(load_cube(os.environ['XRF_CUBE']).array).run(host='0.0.0.0', port=8765)"]
+CMD ["uv", "run", "python", "-c", "import os; from xrf_visualizer.data import load_cube; from xrf_visualizer.ui import build_app; p = os.environ.get('XRF_CUBE') or None; build_app(load_cube(p).array if p else None).run(host='0.0.0.0', port=8765)"]

@@ -18,6 +18,9 @@ parts were removed by decision; the custom CHNet raw reader is deferred.
   `timeline.md`.
 - M5 (deployment recipes) completed 2026-11-11 — **recipes only, NOT
   TESTED**: `deploy/{docker,wslc,apptainer}/` + existing `deploy/uv/`.
+- M6 (empty start + file loading) completed 2026-11-11: `build_app(None)`
+  starts empty; upload (.npz/.h5/.npy) or http(s) link in the UI;
+  `XRF_CUBE` optional in all containers.
   Scope and acceptance criteria: `operational_plan.md`; verified numerical
   conventions: `scientific_notes.md`.
 
@@ -25,7 +28,7 @@ parts were removed by decision; the custom CHNet raw reader is deferred.
 
 ```bash
 uv sync
-.venv/bin/python -m pytest -q          # 31 passed + 1 GPU skip, ~18 s, CPU only
+.venv/bin/python -m pytest -q          # 49 passed + 1 GPU skip, ~22 s, CPU only
 .venv/bin/python -m ipykernel install --user --name xrf-viz \
     --display-name "Python 3.12 (xrf-viz)"
 ```
@@ -65,6 +68,23 @@ host, 2026-11-10). GPU is an opt-in, NOT TESTED variant —
   selection. All selections are clamped before reaching `processing/`.
 - `example.ipynb`: set `path_to_file`, then `build_app(cube)` and
   `app.run(jupyter_mode=True)`; `app.run()` also works from a terminal.
+
+## File loading (M6, implemented 2026-11-11)
+
+- `build_app(cube=None)` starts empty: both panels show "no cube loaded"
+  until a file is loaded.
+- Upload: drag & drop or click, `.npz` / `.h5` / `.npy` — validated with
+  the same readers as `load_cube`. Unknown extensions are rejected;
+  nameless files are recognized by magic bytes.
+- Link: paste an http(s) direct download link (Zenodo, ownCloud/nextCloud
+  share links, ...) and press "Load from link" — the app downloads (500 MB
+  cap, 60 s timeout) and validates it the same way. Links that return HTML
+  (a share page instead of the file) fail with a clear error.
+- "Change file" clears the cube back to the empty state; on load failure
+  the current cube is untouched.
+- Containers: `XRF_CUBE` is now **optional** in Docker/WSLC/Apptainer —
+  unset (and no `/data` bind) the app starts empty with the same
+  upload/link UI.
 
 ## Repository map
 

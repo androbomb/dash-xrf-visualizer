@@ -12,13 +12,33 @@ Readers never import Dash; numeric reductions live in ``processing`` (M3).
 from __future__ import annotations
 
 import json
+import os
+import tempfile
+import urllib.request
 from dataclasses import dataclass
+from email.parser import BytesParser
 from pathlib import Path
+from urllib.parse import unquote, urlparse
 
 import h5py
 import numpy as np
 
-__all__ = ["XrfCube", "load_cube", "load_xrf_lines"]
+__all__ = [
+    "XrfCube",
+    "load_cube",
+    "load_cube_bytes",
+    "download_cube",
+    "sniff_format",
+    "load_xrf_lines",
+]
+
+# Magic bytes -> extension, used when a file (e.g. a download link) has no
+# usable extension.
+_MAGIC = (
+    (b"\x93NUMPY", ".npy"),
+    (b"PK\x03\x04", ".npz"),
+    (b"\x89HDF\r\n\x1a\n", ".h5"),
+)
 
 
 @dataclass(frozen=True)
@@ -78,6 +98,67 @@ def load_cube(path: str | Path) -> XrfCube:
         return XrfCube(p, arr, None)
 
     raise ValueError(f"unsupported XRF file: {p.name} (expected .h5, .hdf5, .npz or .npy)")
+
+
+def sniff_format(data: bytes) -> str:
+    """'.npy' | '.npz' | '.h5' from magic bytes; ValueError on unknown data."""
+    for magic, ext in _MAGIC:
+        if data[: len(magic)] == magic:
+            return ext
+    raise ValueError("unrecognized file format (expected .npy, .npz or HDF5 magic bytes)")
+
+
+def load_cube_bytes(data: bytes, name: str = "") -> XrfCube:
+    """Load a cube from in-memory bytes (uploads/downloads).
+
+    Format comes from the name's extension when it is a known one, otherwise
+    from magic-byte sniffing. Reuses :func:`load_cube` on a temp file, so the
+    full schema validation applies.
+    """
+    suffix = Path(name).suffix.lower() if name else ""
+    if suffix and suffix not in (".h5", ".hdf5", ".npz", ".npy"):
+        raise ValueError(
+            f"unsupported XRF file '{Path(name).name}' (expected .h5, .hdf5, .npz or .npy)"
+        )
+    if suffix not in (".h5", ".hdf5", ".npz", ".npy"):
+        suffix = sniff_format(data)
+    fd, tmp = tempfile.mkstemp(suffix=suffix)
+    try:
+        with os.fdopen(fd, "wb") as f:
+            f.write(data)
+        cube = load_cube(tmp)
+    finally:
+        os.unlink(tmp)
+    return XrfCube(Path(name) if name else Path("in-memory"), cube.array, cube.energy)
+
+
+def _name_from_response(headers, url: str) -> str:
+    cd = headers.get("Content-Disposition")
+    if cd:
+        msg = BytesParser().parsebytes(cd.encode())
+        name = msg.get_filename()
+        if name:
+            return name
+    return Path(unquote(urlparse(url).path)).name or ""
+
+
+def download_cube(url: str, max_bytes: int = 500 * 1024 * 1024,
+                  timeout: float = 60.0) -> XrfCube:
+    """Download an XRF cube from an http(s) URL and validate it as a cube.
+
+    Works with direct download links (Zenodo, ownCloud/nextCloud share links,
+    ...). Authenticated/redirect-only links that return HTML instead of the
+    file fail validation with a clear error.
+    """
+    if not url.lower().startswith(("http://", "https://")):
+        raise ValueError(f"only http(s) URLs are supported, got {url[:50]!r}")
+    req = urllib.request.Request(url, headers={"User-Agent": "xrf-visualizer/0.1"})
+    with urllib.request.urlopen(req, timeout=timeout) as r:
+        name = _name_from_response(r.headers, url)
+        data = r.read(max_bytes + 1)
+    if len(data) > max_bytes:
+        raise ValueError(f"download exceeds {max_bytes // (1024 * 1024)} MB limit")
+    return load_cube_bytes(data, name)
 
 
 def load_xrf_lines() -> list[dict[str, str | float]]:
