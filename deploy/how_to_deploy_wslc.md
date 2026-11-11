@@ -2,8 +2,10 @@
 
 **Status:** NOT TESTED (recipe drafted 2026-11-11; run this in your
 environment and fill the result log). CPU-only JAX: no GPU passthrough.
-Flag names mirror the standard `docker run` form — if your `wslc` version
-differs, check `wslc build --help` / `wslc run --help`.
+`wslc run` uses the docker short-flag form `-p` / `-v` / `-e` (verified
+against Microsoft's WSLC docs 2026-11-11); the `wslc build --tag --file`
+form worked in a real user build. If your version differs, check
+`wslc build --help` / `wslc run --help`.
 
 ## Prerequisites
 
@@ -20,17 +22,20 @@ differs, check `wslc build --help` / `wslc run --help`.
 2. Run — with a preloaded cube (adjust the path and cube filename):
 
    ```bash
-   wslc run --port 8765:8765 \
-       --volume /home/<you>/xrf-data:/data:ro \
-       --environment XRF_CUBE=/data/Mantegna_mappa3b_centro-sx_35kV-90uA.npz \
+   wslc run -p 8765:8765 \
+       -v C:\Users\<you>\xrf-data:/data:ro \
+       -e XRF_CUBE=/data/Mantegna_mappa3b_centro-sx_35kV-90uA.npz \
        xrf-viz
    ```
+
+   (`-v` takes a **Windows** source path or a named volume; the `:ro`
+   suffix follows the docker form — drop it if your wslc version rejects it.)
 
    Or empty (M6 — no env, no volume): the app starts with "no cube
    loaded" and you upload a file or paste a download link in the UI:
 
    ```bash
-   wslc run --port 8765:8765 xrf-viz
+   wslc run -p 8765:8765 xrf-viz
    ```
 
 3. Open `http://localhost:8765`. First request compiles the JAX reductions —
