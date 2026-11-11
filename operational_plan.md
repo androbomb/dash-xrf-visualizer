@@ -1,7 +1,7 @@
 # Operational plan — XRF-only visualizer (Dash / Jupyter / JAX)
 
-> **Status:** user-approved *target requirements*, NOT verified repository behavior.
-> **Current milestone:** M1 (baseline + approved docs), completed 2026-11-10 after M0 approval.
+> **Status:** requirements implemented — M0–M5 completed 2026-11-10/11 (M3/M4/M5 evidence in `timeline.md`).
+> **Remaining:** user-side container tests, GPU validation, deferred items in Section 7.
 > **Repository path seen by Hermes:** `/workspace/exchange/dash-xrf-visualizer`.
 > M0 (read-only audit, 2026-11-10) verified the legacy code and the user-supplied example data; findings are recorded in `scientific_notes.md` and `timeline.md`. The decisions explicitly fixed below must not be reopened unnecessarily.
 
@@ -77,6 +77,8 @@ The repository root should be small. The example notebook is the only user-facin
 
 Tree is an understandable **proposal**, not an instruction to create empty files or excessive abstractions. Keep the smallest number of modules that really separates data ingestion, numerical operations, UI layout, callbacks and Plotly. If a compelling reason exists to use a different test directory or package name, report it at the gate.
 
+**Actual layout (M2–M4):** `data/__init__.py` (readers + schema validation in one module — the split into `readers.py`/`schema.py` was not justified), `ui/app.py` (app factory, figures and callbacks in one module; splitting into `layout.py`/`callbacks.py`/`figures.py` would mirror the diagram without buying separation, per `AGENTS.md` rule 4). `app.py` in the package root was not created — `build_app` lives in `ui/app.py`.
+
 ### Legacy folder
 
 - Root-relative `dash-xrf-analyzer/` is a **bootstrap/reference-only** folder, to be ignored by Git (`/dash-xrf-analyzer/`).
@@ -146,12 +148,14 @@ Tree is an understandable **proposal**, not an instruction to create empty files
 | --- | --- | --- |
 | **M0 — READ-ONLY** ✅ 2026-11-10 | Evidence report: existing code, formats, feature mapping, risks, precise M1 proposal | Approved 2026-11-10 |
 | **M1 — Baseline + approved docs** ✅ 2026-11-10 | Representative small fixture, known XRF arithmetic results, coordinated docs plan | Approved 2026-11-10 |
-| **M2 — Readers + source package** | HDF5 / NumPy readers, `src/` layout, minimal `tests/`, uv packaging | Test schemas and no AIRES coupling |
-| **M3 — JAX + ROI reductions** | GPU-aware device policy, validated spectrum/map algorithms | CPU correctness before speed |
-| **M4 — Dash / Jupyter** | Clear layout/callback split, root example notebook, interactive ROI | Verify notebook behavior |
-| **M5 — Cleanup + deploy docs** | Prune AIRES, ignore bootstrap folder, container recipes, final README | User tests unexecutable runtimes; no unapproved deletions |
+| **M2 — Readers + source package** ✅ 2026-11-10 | HDF5 / NumPy readers, `src/` layout, minimal `tests/`, uv packaging | Test schemas and no AIRES coupling (17 passed) |
+| **M3 — JAX + ROI reductions** ✅ 2026-11-10 | Device policy + float64 reductions, bit-exact vs goldens | CPU correctness before speed (24 passed, GPU skipped) |
+| **M4 — Dash / Jupyter** ✅ 2026-11-11 | `ui/app.py` (factory, figures, callbacks), root example notebook, zoom = selection + explicit panels | Server-level E2E bit-exact vs processing (31 passed, GPU skipped) |
+| **M5 — Cleanup + deploy docs** ✅ 2026-11-11 | AIRES/TF absence grep (0 hits), `deploy/{docker,wslc,apptainer}/` recipes **NOT TESTED**, final README | User tests unexecutable runtimes; no unapproved deletions |
 
 These are planning checkpoints, NOT evidence of work performed. Use small reversible commits only when the user authorizes writes; never push without explicit approval. Do not delete `dash-xrf-analyzer/` automatically.
+
+**F-status (evidence in `timeline.md`):** F1/F2 — M2 (round-trip fixtures + real-file metadata). F3/F4 — M3 (goldens) + M4 (zoom E2E). F5 — M4 at server level (figures bit-exact via callback endpoint, HTTP 200); *visual browser check still user-side* (no Chromium in Hermes). F6 — M3 (bit-exact CPU vs float64 reference). F7 — **NOT TESTED** (GPU skip in suite). F8 — M5 (grep 0 hits in `src/` + `pyproject.toml`). F9 — M1 (uv sync, kernel `xrf-viz`). F10 — M5 (recipes present, **NOT TESTED**).
 
 ## 6. Documentation ownership
 
@@ -160,5 +164,10 @@ These are planning checkpoints, NOT evidence of work performed. Use small revers
 - `to_do.md`: actionable prospective tasks (do not duplicate this whole plan).
 - `timeline.md`: observed activity only; append when work actually happened.
 - `scientific_notes.md`: only necessary physical/numerical assumptions or equations.
-- `README.md`: currently bootstrap-only; replace with verified human-facing project guide when authorized.
+- `README.md`: human-facing project guide (replaced the bootstrap template in M1; kept in sync at M4/M5).
 - `first_prompt_telegram.md`: initial read-only M0 request, not independent authorization to run later tasks.
+
+## 7. Deferred / pending (2026-11-11)
+
+- **TO DO (user decision, on hold):** drag-mode select on the map — plotly drag-mode selection in addition to zoom = selection. Tracked in `to_do.md` (Later); implement only on explicit request.
+- User-side: run the `deploy/` recipes (`how_to_deploy_*.md`), GPU validation on WSL2 (RTX 5070 Ti, `jax[cuda12]` variant), visual browser pass of the UI, removal decision for `dash-xrf-analyzer/`.
