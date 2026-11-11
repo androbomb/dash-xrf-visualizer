@@ -67,3 +67,9 @@ been performed as part of creating these templates. Do not invent entries.
 - **Limitations / blockers:** no Docker, WSLC or Apptainer in this environment — recipes are documentation deliverables and **NOT TESTED**; user will run them. WSLC/Apptainer flag names follow the standard docker form and may need adjustment per CLI version (noted in the READMEs).
 - **Deferred (user decision):** drag-mode select on the map (tracked in `to_do.md` → Later).
 - **Next:** user-side container tests + GPU validation on WSL2 (RTX 5070 Ti); then optional legacy `dash-xrf-analyzer/` removal decision.
+
+### 2026-11-11 — M5 fix: wslc build failure found by user (README.md missing in build context)
+
+- **Observation:** user ran `wslc build --tag xrf-viz --file deploy/wslc/Containerfile .` → step 4 `uv sync --frozen --no-dev` failed: hatchling `OSError: Readme file does not exist: README.md`. Root cause: `pyproject.toml` declares `readme = "README.md"`, but the recipe copied only `pyproject.toml uv.lock` before `uv sync` (the editable project build validates metadata). Same bug in `deploy/docker/Dockerfile`.
+- **Fix:** `COPY pyproject.toml uv.lock README.md ./` in both recipes; how-to notes added (harmless `git was not found` warning during build).
+- **Evidence:** user-side first build attempt (WSLC), failure at the uv step; fix applied in this commit — rebuild pending on the user side.

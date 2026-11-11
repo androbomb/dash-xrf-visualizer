@@ -30,6 +30,10 @@ environment and fill the result log). CPU-only JAX: no GPU passthrough.
 
 ## Notes
 
+- `README.md` is copied alongside `pyproject.toml`: hatchling validates the
+  declared `readme = "README.md"` during the editable build of the project.
+- The `git was not found in the system` warning during the build is harmless
+  (metadata only).
 - Image is `ghcr.io/astral-sh/uv:python3.12-bookworm-slim` + `uv sync --frozen --no-dev`
   (no pytest/ipykernel inside).
 - To iterate on code: rebuild, or `docker run -it --entrypoint uv ...` with a

@@ -31,6 +31,9 @@ differs, check `wslc build --help` / `wslc run --help`.
 
 ## Notes
 
+- The `WARNING: current commit information was not captured by the build: git
+  was not found` line is harmless (metadata only; git is not in the image) —
+  the build proceeds.
 - The `Containerfile` is content-identical to `deploy/docker/Dockerfile`
   (WSLC accepts the same OCI build format); keep them in sync if you change one.
 - The WSLC image store is separate from Docker's; building both is cheap since
