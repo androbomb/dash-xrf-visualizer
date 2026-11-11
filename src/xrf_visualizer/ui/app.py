@@ -13,11 +13,22 @@ clears it. The current cube lives in a Python-side closure (``state``),
 never in a dash Store (too big for JSON round-trips). Selection stores may
 be stale after a new load; the processing layer clamps, and a ``gen`` store
 bump forces the figure callbacks to recompute.
+
+Dash 4.5 return convention (source-verified in dash/_callback.py,
+``_prepare_response``): a callback registered with a single Output receives
+its return value AS-IS; only multi-output callbacks take a tuple of values.
+Returning ``[value]`` from a single-output callback double-wraps it (the
+store got ``[[...]]``, the graph got ``[fig]`` -> 500s after zoom).
+
+M7 look: ported from the legacy dash-xrf-analyzer app (user request) —
+dash-bootstrap-components DARKLY theme, #4196B4 navbar, fluid container,
+5/7 columns, outline info buttons.
 """
 import base64
 import re
 from pathlib import Path
 
+import dash_bootstrap_components as dbc
 import numpy as np
 import plotly.express as px
 import plotly.graph_objects as go
@@ -32,6 +43,7 @@ from ..processing import (
 )
 
 _COLORSCALES = ("Viridis", "Plasma", "Hot", "Greys", "Jet")
+_ACCENT = "#4196B4"  # legacy infn_lightblue
 
 
 # ---------------------------------------------------------------- pure logic
@@ -166,64 +178,102 @@ def build_app(cube=None):
     state = {"cube": arr,
              "name": Path(getattr(cube, "path", "") or "cube").name}
     H, W, C = arr.shape if arr is not None else (0, 0, 0)
-    app = Dash(__name__)
-    app.layout = html.Div([
-        html.Div([
-            html.H3("XRF visualizer", style={"display": "inline-block", "margin-right": 12}),
-            html.Span(id="cube-name",
-                      children=f"— {H} x {W} x {C}" if arr is not None else "— no cube loaded",
-                      style={"verticalAlign": "middle"}),
-            html.Button("Change file", id="change-file", n_clicks=0, style={"float": "right"}),
+    app = Dash(__name__, external_stylesheets=[dbc.themes.DARKLY])
+    app.layout = dbc.Container(fluid=True, children=[
+        dbc.Row([
+            dbc.Col([
+                html.H3("XRF visualizer", style={"display": "inline-block", "margin-right": 12}),
+                html.Span(id="cube-name",
+                          children=f"— {H} x {W} x {C}" if arr is not None else "— no cube loaded",
+                          style={"verticalAlign": "middle"}),
+            ]),
+            dbc.Col([
+                dbc.Button("Change file", id="change-file", n_clicks=0,
+                           outline=True, color="secondary"),
+            ], width="auto"),
         ]),
-        html.Div([
-            dcc.Upload(
-                id="upload",
-                children=html.Div("Upload .npz / .h5 / .npy (drag & drop or click)",
-                                  style={"display": "inline-block", "width": "40%",
-                                         "lineHeight": "50px", "border": "1px dashed #999",
-                                         "textAlign": "center"}),
-                multiple=False,
-            ),
-            dcc.Input(id="url", type="text",
-                      placeholder="https://… (share/download link: ownCloud, nextCloud, Zenodo, …)",
-                      style={"width": "45%"}),
-            html.Button("Load from link", id="load-url", n_clicks=0),
+        dbc.Navbar(
+            [dbc.NavbarBrand("single-point spectrum & map from a 3-D XRF cube")],
+            color=_ACCENT,
+        ),
+        html.Br(),
+        # --- M6 file loading (was the top inputs block) ---
+        dbc.Row([
+            dbc.Col(md=5, children=[
+                dcc.Upload(
+                    id="upload",
+                    children=html.Div("Upload .npz / .h5 / .npy (drag & drop or click)",
+                                      style={"display": "inline-block", "width": "100%",
+                                             "lineHeight": "50px", "border": "1px dashed #999",
+                                             "textAlign": "center"}),
+                    multiple=False,
+                ),
+            ]),
+            dbc.Col(md=4, children=[
+                dbc.Input(id="url", type="text",
+                          placeholder="https://… (share/download link: ownCloud, nextCloud, Zenodo, …)",
+                          style={"width": "100%"}),
+            ]),
+            dbc.Col(md=3, children=[
+                dbc.Button("Load from link", id="load-url", n_clicks=0,
+                           outline=True, color="info"),
+            ]),
         ]),
-        html.Div(id="load-msg", style={"color": "darkred"}),
-        html.Div([
-            html.Div(dcc.Graph(id="map", style={"height": "60vh"}),
-                     style={"width": "60%", "display": "inline-block"}),
-            html.Div(dcc.Graph(id="spectrum", style={"height": "60vh"}),
-                     style={"width": "38%", "display": "inline-block"}),
+        html.Div(id="load-msg", style={"color": "orange"}),
+        # --- body: 5/7 split like the legacy app ---
+        dbc.Row([
+            ### map column
+            dbc.Col(md=5, children=[
+                dbc.Col(html.H4("XRF Map", style={"color": _ACCENT}),
+                        width={"size": 6, "offset": 3}),
+                dcc.Graph(id="map", style={"height": "60vh"}),
+                html.Div(className="row", children=[
+                    html.Label("zmin"), dbc.Input(id="zmin", type="number", style={"width": 70}),
+                    html.Label("zmax"), dbc.Input(id="zmax", type="number", style={"width": 70}),
+                    dcc.Dropdown(id="colorscale",
+                                 options=[{"label": n, "value": n} for n in _COLORSCALES],
+                                 value="Viridis", style={"width": 110, "marginLeft": "8px"}),
+                    dcc.Checklist(id="log", options=[{"label": "log", "value": "log"}], value=[]),
+                ]),
+                html.Div(className="row", children=[
+                    html.B("Interval -> map: "),
+                    html.Label("ch s"), dbc.Input(id="ch-s", type="number", value=0, style={"width": 70}),
+                    html.Label("ch e"), dbc.Input(id="ch-e", type="number", value=C, style={"width": 70}),
+                    dbc.Button("Apply interval", id="apply-ch", n_clicks=0,
+                               outline=True, color="info", className="ml-2"),
+                ]),
+            ]),
+            ### spectrum column
+            dbc.Col(md=7, children=[
+                dbc.Col(html.H4("XRF Spectrum", style={"color": _ACCENT}),
+                        width={"size": 6, "offset": 3}),
+                dcc.Graph(id="spectrum", style={"height": "60vh"}),
+                html.Div(className="row", children=[
+                    html.B("ROI (rows y, cols x) -> spectrum: "),
+                    html.Label("y0"), dbc.Input(id="roi-y0", type="number", value=0, style={"width": 60}),
+                    html.Label("y1"), dbc.Input(id="roi-y1", type="number", value=H, style={"width": 60}),
+                    html.Label("x0"), dbc.Input(id="roi-x0", type="number", value=0, style={"width": 60}),
+                    html.Label("x1"), dbc.Input(id="roi-x1", type="number", value=W, style={"width": 60}),
+                    dbc.Button("Apply ROI", id="apply-roi", n_clicks=0,
+                               outline=True, color="info", className="ml-2"),
+                ]),
+                html.Div(className="row", children=[
+                    html.B("Points -> spectrum: "),
+                    html.Label("rows"), dbc.Input(id="pt-rows", type="text", placeholder="10, 19", style={"width": 110}),
+                    html.Label("cols"), dbc.Input(id="pt-cols", type="text", placeholder="30, 39", style={"width": 110}),
+                    dbc.Button("Apply points", id="apply-points", n_clicks=0,
+                               outline=True, color="info", className="ml-2"),
+                    dbc.Button("Clear selection", id="clear", n_clicks=0,
+                               outline=True, color="danger", className="ml-1"),
+                ]),
+                html.Div(className="row", children=[
+                    html.B("Calibration (keV): "),
+                    html.Label("m"), dbc.Input(id="m", type="number", step=0.001, style={"width": 70}),
+                    html.Label("q"), dbc.Input(id="q", type="number", step=0.001, style={"width": 70}),
+                ]),
+            ]),
         ]),
-        html.Div([
-            html.B("ROI (rows y, cols x) -> spectrum: "),
-            html.Label("y0"), dcc.Input(id="roi-y0", type="number", value=0, style={"width": 70}),
-            html.Label("y1"), dcc.Input(id="roi-y1", type="number", value=H, style={"width": 70}),
-            html.Label("x0"), dcc.Input(id="roi-x0", type="number", value=0, style={"width": 70}),
-            html.Label("x1"), dcc.Input(id="roi-x1", type="number", value=W, style={"width": 70}),
-            html.Button("Apply ROI", id="apply-roi", n_clicks=0),
-            html.B("  Points -> spectrum: "),
-            html.Label("rows"), dcc.Input(id="pt-rows", type="text", placeholder="10, 19", style={"width": 110}),
-            html.Label("cols"), dcc.Input(id="pt-cols", type="text", placeholder="30, 39", style={"width": 110}),
-            html.Button("Apply points", id="apply-points", n_clicks=0),
-            html.Button("Clear selection", id="clear", n_clicks=0),
-            html.B("  Interval -> map: "),
-            html.Label("ch s"), dcc.Input(id="ch-s", type="number", value=0, style={"width": 70}),
-            html.Label("ch e"), dcc.Input(id="ch-e", type="number", value=C, style={"width": 70}),
-            html.Button("Apply interval", id="apply-ch", n_clicks=0),
-            html.B("  Display: "),
-            html.Label("zmin"), dcc.Input(id="zmin", type="number", style={"width": 70}),
-            html.Label("zmax"), dcc.Input(id="zmax", type="number", style={"width": 70}),
-            dcc.Dropdown(id="colorscale",
-                         options=[{"label": n, "value": n} for n in _COLORSCALES],
-                         value="Viridis", style={"width": 110}),
-            dcc.Checklist(id="log", options=[{"label": "log", "value": "log"}], value=[]),
-            html.B("  Calibration (keV): "),
-            html.Label("m"), dcc.Input(id="m", type="number", step=0.001, style={"width": 70}),
-            html.Label("q"), dcc.Input(id="q", type="number", step=0.001, style={"width": 70}),
-        ]),
-        html.Div(id="msg", style={"color": "red"}),
+        html.Div(id="msg", style={"color": "orange"}),
         dcc.Store(id="roi-store", data=[0, H, 0, W]),
         dcc.Store(id="ch-store", data=[0, C]),
         dcc.Store(id="points-store", data=[]),
@@ -238,12 +288,12 @@ def build_app(cube=None):
     def _map_figure(ch, zmin, zmax, cscale, log, _gen):
         c = state["cube"]
         if c is None:
-            return [_empty_figure("No cube loaded — upload a file or paste a link above")]
+            return _empty_figure("No cube loaded — upload a file or paste a link above")
         s, e = ch
         if e is None or e <= (s or 0):  # stale/empty interval -> full channels
             s, e = 0, c.shape[2]
-        # dash 4: callbacks return a list of values, even for a single Output
-        return [map_figure(c, s, e, zmin, zmax, cscale, bool(log))]
+        # dash 4.5: single Output -> return the raw value (no [..] wrap)
+        return map_figure(c, s, e, zmin, zmax, cscale, bool(log))
 
     @app.callback(Output("spectrum", "figure"),
                   Input("roi-store", "data"), Input("points-store", "data"),
@@ -252,14 +302,14 @@ def build_app(cube=None):
     def _spec_figure(roi, pts, m, q, _gen):
         c = state["cube"]
         if c is None:
-            return [_empty_figure("No cube loaded")]
+            return _empty_figure("No cube loaded")
         H, W, _ = c.shape
         if pts:  # drop points stale from a previous cube; all stale -> ROI
             keep = [p for p in pts if 0 <= p[0] < H and 0 <= p[1] < W]
             pts = keep or None
         if roi and roi[1] <= roi[0] and roi[3] <= roi[2]:  # degenerate ROI -> full frame
             roi = None
-        return [spectrum_figure(c, roi=roi, points=pts, m=m, q=q)]
+        return spectrum_figure(c, roi=roi, points=pts, m=m, q=q)
 
     @app.callback(Output("roi-store", "data"),
                   Input("map", "relayoutData"), Input("apply-roi", "n_clicks"),
@@ -270,15 +320,15 @@ def build_app(cube=None):
     def _set_roi(rl, n, cur, y0, y1, x0, x1):
         c = state["cube"]
         if c is None:
-            return [cur]
+            return cur
         H, W, _ = c.shape
         if rl:
             r = _roi_from_relayout(rl, H, W)
             if r is not None:
-                return [r]
+                return r
         if n:
-            return [_clamp_roi(H, W, y0, y1, x0, x1)]
-        return [cur]
+            return _clamp_roi(H, W, y0, y1, x0, x1)
+        return cur
 
     @app.callback(Output("ch-store", "data"),
                   Input("spectrum", "relayoutData"), Input("apply-ch", "n_clicks"),
@@ -288,17 +338,17 @@ def build_app(cube=None):
     def _set_ch(rl, n, cur, s, e):
         c = state["cube"]
         if c is None:
-            return [cur]
+            return cur
         C = c.shape[2]
         if rl:
             r = _ch_from_relayout(rl, C)
             if r is not None:
-                return [r]
+                return r
         if n:
             s = max(0, min(int(s or 0), C))
             e = max(0, min(int(e or C), C))
-            return [[min(s, e), max(s, e)]]
-        return [cur]
+            return [min(s, e), max(s, e)]
+        return cur
 
     @app.callback([Output("points-store", "data"), Output("msg", "children")],
                   Input("apply-points", "n_clicks"), Input("clear", "n_clicks"),

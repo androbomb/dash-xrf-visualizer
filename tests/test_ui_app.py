@@ -144,11 +144,11 @@ def test_build_app_empty():
                      "upload", "url", "load-url", "change-file", "load-msg",
                      "cube-name", "gen"):
         assert expected in ids
-    # figures render the empty state without a cube
+    # figures render the empty state without a cube (raw figure, dash 4.5 single-Output)
     f = _cb(app, "map.figure")([0, 0], None, None, "Viridis", [], 0)
-    assert not f[0].data
+    assert not f.data
     f = _cb(app, "spectrum.figure")([0, 0, 0, 0], [], None, None, 0)
-    assert not f[0].data
+    assert not f.data
 
 
 def test_on_load_upload(empty_app, cube):
@@ -159,7 +159,7 @@ def test_on_load_upload(empty_app, cube):
     assert out[4] == 1  # gen bumped
     # map figure now matches the processing layer for the full channel range
     m = _cb(empty_app, "map.figure")([0, C], None, None, "Viridis", [], 1)
-    z = np.asarray(m[0].data[0]["z"])
+    z = np.asarray(m.data[0]["z"])
     from xrf_visualizer.processing import map_from_channels
     np.testing.assert_array_equal(z, map_from_channels(cube, 0, C))
 
@@ -173,7 +173,7 @@ def test_on_load_upload_bad_bytes(empty_app, cube):
     assert out[4] is no_update
     # state untouched: figures still empty
     m = _cb(empty_app, "map.figure")([0, C], None, None, "Viridis", [], 0)
-    assert not m[0].data
+    assert not m.data
 
 
 def test_on_load_change(empty_app):

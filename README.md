@@ -23,6 +23,11 @@ parts were removed by decision; the custom CHNet raw reader is deferred.
   `XRF_CUBE` optional in all containers.
   Scope and acceptance criteria: `operational_plan.md`; verified numerical
   conventions: `scientific_notes.md`.
+- M7 (UI fix + legacy look) completed 2026-11-11: fixed the dash 4.5
+  callback return convention (single `Output` → raw value; the `[value]`
+  wrap double-wrapped the stores and 500'd on real WSLC traffic) and
+  ported the legacy `dash-bootstrap-components` look (DARKLY theme,
+  `#4196B4` navbar, 5/7 columns).
 
 ## Setup (verified 2026-11-10)
 
@@ -55,6 +60,10 @@ host, 2026-11-10). GPU is an opt-in, NOT TESTED variant —
 
 ## Layout / interactions (M4, implemented 2026-11-11)
 
+- **Look (M7):** `dash-bootstrap-components` — DARKLY theme, `#4196B4`
+  navbar, fluid container, 5/7 column split (map | controls, spectrum |
+  controls), outline info buttons — ported from the legacy
+  `dash-xrf-analyzer` app.
 - Left: 2-D map (heatmap); zmin/zmax, colorscale, log controls.
 - Right: spectrum (keV axis when `m` is set, otherwise channel (ADC) vs
   sum counts).
