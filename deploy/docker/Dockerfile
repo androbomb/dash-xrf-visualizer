@@ -1,0 +1,13 @@
+# XRF visualizer — CPU-only JAX runtime. NOT TESTED (see README.md).
+FROM ghcr.io/astral-sh/uv:python3.12-bookworm-slim
+
+WORKDIR /app
+COPY pyproject.toml uv.lock ./
+RUN uv sync --frozen --no-dev
+COPY src/ ./src/
+COPY tests/ ./tests/
+
+# Cube path, bind-mount the data dir read-only at /data.
+ENV XRF_CUBE=/data/cube.npz
+EXPOSE 8765
+CMD ["uv", "run", "python", "-c", "import os; from xrf_visualizer.data import load_cube; from xrf_visualizer.ui import build_app; build_app(load_cube(os.environ['XRF_CUBE']).array).run(host='0.0.0.0', port=8765)"]

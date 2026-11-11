@@ -58,3 +58,12 @@ been performed as part of creating these templates. Do not invent entries.
 - **Evidence:** pytest → 31 passed, 1 skipped (GPU, NOT TESTED) in ~18 s; live server on the real Mantegna cube (76×177×500 float32): HTTP 200, all 20 component ids in the layout; E2E through the real `/_dash-update-component` endpoint (dash 4.5 wire format): map figure bit-exact vs `map_from_channels`, spectrum figure bit-exact vs `spectrum_from_roi`; zoom→ROI `[19, 30, 10, 50]`; zoom→interval `[100, 120]`; valid points stored + message cleared; invalid points → error message, store unchanged.
 - **Notes:** dash 4.5 breaking change discovered empirically — callbacks must return a **list** of values even for a single `Output` (scalar return → HTTP 500); single-output key in `callback_map` is `id.property`, multi-output `..a...b..`; plotly serializes figure arrays binary (`bdata`/`dtype`/`shape`), so E2E checks decode them. Pan is not distinguishable from zoom in the `relayoutData` signal, so panning also moves the selection (documented limitation). Browser-level click testing not possible in this environment (no Chromium) — HTTP-level E2E used instead.
 - **Next:** M5 (AIRES/TF absence gate, deploy recipes marked NOT TESTED, final README pass).
+
+### 2026-11-11 — M5: absence gate + deployment recipes (completed, recipes NOT TESTED)
+
+- **Objective:** verify no AIRES/TF/PyTorch residue in the new runtime; provide Docker/WSLC/Apptainer recipes marked NOT TESTED; final README pass.
+- **Work:** `deploy/docker/` (Dockerfile + README), `deploy/wslc/` (Containerfile + README), `deploy/apptainer/` (xrf-viz.def + README) — all based on `ghcr.io/astral-sh/uv:python3.12-bookworm-slim`, `uv sync --frozen --no-dev`, CPU-only JAX, cube via `XRF_CUBE` env + read-only `/data` bind, port 8765; README final pass (M4/M5 status).
+- **Evidence:** `grep -ri "aires|tensorflow|keras" src/ pyproject.toml` → 0 hits (runtime is AIRES/TF-free); `pytest` → 31 passed, 1 skipped (GPU, NOT TESTED).
+- **Limitations / blockers:** no Docker, WSLC or Apptainer in this environment — recipes are documentation deliverables and **NOT TESTED**; user will run them. WSLC/Apptainer flag names follow the standard docker form and may need adjustment per CLI version (noted in the READMEs).
+- **Deferred (user decision):** drag-mode select on the map (tracked in `to_do.md` → Later).
+- **Next:** user-side container tests + GPU validation on WSL2 (RTX 5070 Ti); then optional legacy `dash-xrf-analyzer/` removal decision.

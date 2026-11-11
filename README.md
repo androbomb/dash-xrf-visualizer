@@ -16,7 +16,8 @@ parts were removed by decision; the custom CHNet raw reader is deferred.
   M2 (readers, `XRFlines`), M3 (JAX float64 reductions, bit-exact vs
   goldens) completed 2026-11-10; M4 (Dash UI) completed 2026-11-11 — see
   `timeline.md`.
-- **Not implemented yet:** deployment recipes (M5, NOT TESTED).
+- M5 (deployment recipes) completed 2026-11-11 — **recipes only, NOT
+  TESTED**: `deploy/{docker,wslc,apptainer}/` + existing `deploy/uv/`.
   Scope and acceptance criteria: `operational_plan.md`; verified numerical
   conventions: `scientific_notes.md`.
 

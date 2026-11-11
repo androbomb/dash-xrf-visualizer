@@ -1,0 +1,13 @@
+# XRF visualizer — Apptainer recipe. NOT TESTED (see README.md).
+# Boots from the Docker image, so build that first:
+#   docker build -t xrf-viz -f deploy/docker/Dockerfile .
+
+Bootstrap: docker
+From: xrf-viz:latest
+
+%labels
+    Description "XRF-only Dash/JAX visualizer (map + spectrum)"
+    Maintainer "androbomb"
+
+%runscript
+uv run python -c "import os; from xrf_visualizer.data import load_cube; from xrf_visualizer.ui import build_app; build_app(load_cube(os.environ.get('XRF_CUBE', '/data/cube.npz')).array).run(host='0.0.0.0', port=8765)"
