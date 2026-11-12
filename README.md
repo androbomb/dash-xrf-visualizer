@@ -39,12 +39,15 @@ parts were removed by decision; the custom CHNet raw reader is deferred.
 - M10 (selection zoom + controls) completed 2026-11-12: Apply ROI/interval also
   sets the corresponding plot zoom; Apply scale explicitly refreshes display
   limits; legacy `jupyter_mode=True` is accepted as an alias for `"inline"`.
+- M11 (Plotly interactions) completed 2026-11-12: parse Plotly's actual
+  `xaxis.range[0]` relayout keys, show selected points on the map, and apply
+  log1p to spectrum counts as well as map counts.
 
 ## Setup (verified 2026-11-10)
 
 ```bash
 uv sync
-.venv/bin/python -m pytest -q          # 49 passed + 1 GPU skip, ~22 s, CPU only
+.venv/bin/python -m pytest -q          # 53 passed + 1 GPU skip, CPU only
 .venv/bin/python -m ipykernel install --user --name xrf-viz \
     --display-name "Python 3.12 (xrf-viz)"
 ```
@@ -94,6 +97,8 @@ host, 2026-11-10). GPU is an opt-in, NOT TESTED variant —
 - M10: numeric ROI/channel actions zoom the associated plot as well as update
   the opposite plot; Apply scale is available for explicit color-limit refresh.
   The Dash wrapper accepts the legacy boolean notebook mode for compatibility.
+- M11: Plotly zoom relayout payloads use `axis.range[n]`; selected map points
+  are overlaid on the map, and the log checkbox transforms both plotted sums.
 - `example.ipynb`: set `path_to_file`, then `build_app(cube)` and
   `app.run(jupyter_mode="inline")` (Dash 4.x); `app.run()` also works from a terminal.
 

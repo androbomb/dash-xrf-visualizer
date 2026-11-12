@@ -63,12 +63,18 @@ def _roi_from_relayout(rl, H, W):
     if not rl:
         return None
     if any(k in ("xautorange", "yautorange", "xaxis.autorange", "yaxis.autorange")
-           for k in rl):
+           and rl[k] for k in rl):
         return [0, H, 0, W]
-    if "xrange" not in rl and "yrange" not in rl:
+    if not any(k in rl for k in ("xrange", "yrange", "xaxis.range", "yaxis.range",
+                                  "xaxis.range[0]", "xaxis.range[1]",
+                                  "yaxis.range[0]", "yaxis.range[1]")):
         return None
-    xa, xb = sorted(rl.get("xrange", (0, W)))
-    ya, yb = sorted(rl.get("yrange", (0, H)))
+    xa, xb = rl.get("xrange", rl.get("xaxis.range", (
+        rl.get("xaxis.range[0]", 0), rl.get("xaxis.range[1]", W))))
+    ya, yb = rl.get("yrange", rl.get("yaxis.range", (
+        rl.get("yaxis.range[0]", 0), rl.get("yaxis.range[1]", H))))
+    xa, xb = sorted((xa, xb))
+    ya, yb = sorted((ya, yb))
     x0 = max(0, min(int(np.floor(xa)), W))
     x1 = max(0, min(int(np.ceil(xb)), W))
     y0 = max(0, min(int(np.floor(ya)), H))
@@ -80,11 +86,13 @@ def _ch_from_relayout(rl, C):
     """Spectrum zoom -> channel interval [s, e] from relayoutData; None = ignore."""
     if not rl:
         return None
-    if any(k in ("xautorange", "xaxis.autorange") for k in rl):
+    if any(k in ("xautorange", "xaxis.autorange") and rl[k] for k in rl):
         return [0, C]
-    if "xrange" not in rl:
+    if not any(k in rl for k in ("xrange", "xaxis.range", "xaxis.range[0]", "xaxis.range[1]")):
         return None
-    a, b = sorted(rl["xrange"])
+    a, b = rl.get("xrange", rl.get("xaxis.range", (
+        rl.get("xaxis.range[0]", 0), rl.get("xaxis.range[1]", C))))
+    a, b = sorted((a, b))
     s = max(0, min(int(np.floor(a)), C))
     e = max(0, min(int(np.ceil(b)), C))
     return [s, e]
@@ -112,7 +120,7 @@ def _parse_points(rows_s, cols_s):
 # ------------------------------------------------------------ figure builders
 
 def map_figure(cube, ch_start, ch_end, zmin=None, zmax=None,
-               colorscale="Viridis", log=False, m=None, q=None, roi=None):
+               colorscale="Viridis", log=False, m=None, q=None, roi=None, points=None):
     """Current map: plain float64 channel sum, display options applied."""
     image = map_from_channels(cube, ch_start, ch_end)
     if log:  # shortcut: log via data transform; zmin/zmax then apply to log1p values
@@ -131,10 +139,15 @@ def map_figure(cube, ch_start, ch_end, zmin=None, zmax=None,
         y0, y1, x0, x1 = roi
         fig.update_layout(xaxis_range=[x0 - 0.5, x1 - 0.5],
                           yaxis_range=[y1 - 0.5, y0 - 0.5])
+    if points:
+        fig.add_scatter(x=[p[1] for p in points], y=[p[0] for p in points],
+                        mode="markers", marker={"size": 10, "color": "white",
+                                                  "line": {"color": "black", "width": 1}},
+                        name="Selected points")
     return fig
 
 
-def spectrum_figure(cube, roi=None, points=None, m=None, q=None, channel_range=None):
+def spectrum_figure(cube, roi=None, points=None, m=None, q=None, channel_range=None, log=False):
     """Current spectrum: plain float64 pixel sum (points win over ROI).
 
     With m != 0 the x-axis is the calibrated energy axis E = m*i + q (keV).
@@ -147,6 +160,8 @@ def spectrum_figure(cube, roi=None, points=None, m=None, q=None, channel_range=N
         y0, y1, x0, x1 = roi if roi else [0, H, 0, W]
         spec = spectrum_from_roi(cube, y0, y1, x0, x1)
         selection = f"Box: y {y0}–{y1}, x {x0}–{x1}"
+    if log:
+        spec = np.log1p(spec)
     if m is not None:
         e = calibrate(C, m, q or 0.0)
         x, xlab = e, "E (keV)"
@@ -154,7 +169,8 @@ def spectrum_figure(cube, roi=None, points=None, m=None, q=None, channel_range=N
         x, xlab = np.arange(C), "channel (ADC)"
     # go.Scatter (not px.line): px.line wants a pandas frame for plain arrays
     fig = go.Figure(go.Scatter(x=x, y=spec, mode="lines"))
-    fig.update_layout(title=selection, xaxis_title=xlab, yaxis_title="sum counts",
+    fig.update_layout(title=selection, xaxis_title=xlab,
+                      yaxis_title="log1p(sum counts)" if log else "sum counts",
                       margin=dict(l=50, r=10, t=55, b=30))
     if channel_range:
         start, end = channel_range
@@ -303,12 +319,12 @@ def build_app(cube=None):
 
     @app.callback(Output("map", "figure"),
                   Input("ch-store", "data"), Input("roi-store", "data"),
-                  Input("zmin", "value"), Input("zmax", "value"),
-                  Input("colorscale", "value"), Input("log", "value"),
-                  Input("apply-scale", "n_clicks"), Input("apply-calibration", "n_clicks"),
-                  Input("gen", "data"),
-                  State("m", "value"), State("q", "value"))
-    def _map_figure(ch, roi, zmin, zmax, cscale, log, _n_scale, _n_cal, _gen, m, q):
+                  Input("points-store", "data"), Input("colorscale", "value"), Input("log", "value"),
+                  Input("apply-scale", "n_clicks"),
+                  Input("apply-calibration", "n_clicks"), Input("gen", "data"),
+                  State("m", "value"), State("q", "value"), State("zmin", "value"),
+                  State("zmax", "value"))
+    def _map_figure(ch, roi, points, cscale, log, _n_scale, _n_cal, _gen, m, q, zmin, zmax):
         c = state["cube"]
         if c is None:
             return _empty_figure("No cube loaded — upload a file or paste a link above")
@@ -316,14 +332,14 @@ def build_app(cube=None):
         if e is None or e <= (s or 0):  # stale/empty interval -> full channels
             s, e = 0, c.shape[2]
         # dash 4.5: single Output -> return the raw value (no [..] wrap)
-        return map_figure(c, s, e, zmin, zmax, cscale, bool(log), m, q, roi)
+        return map_figure(c, s, e, zmin, zmax, cscale, bool(log), m, q, roi, points)
 
     @app.callback(Output("spectrum", "figure"),
                   Input("roi-store", "data"), Input("points-store", "data"),
-                  Input("ch-store", "data"),
+                  Input("ch-store", "data"), Input("log", "value"),
                   Input("apply-calibration", "n_clicks"), Input("gen", "data"),
                   State("m", "value"), State("q", "value"))
-    def _spec_figure(roi, pts, channels, _n_cal, _gen, m, q):
+    def _spec_figure(roi, pts, channels, log, _n_cal, _gen, m, q):
         c = state["cube"]
         if c is None:
             return _empty_figure("No cube loaded")
@@ -333,7 +349,8 @@ def build_app(cube=None):
             pts = keep or None
         if roi and roi[1] <= roi[0] and roi[3] <= roi[2]:  # degenerate ROI -> full frame
             roi = None
-        return spectrum_figure(c, roi=roi, points=pts, m=m, q=q, channel_range=channels)
+        return spectrum_figure(c, roi=roi, points=pts, m=m, q=q,
+                               channel_range=channels, log=bool(log))
 
     @app.callback(Output("roi-store", "data"),
                   Input("map", "relayoutData"), Input("apply-roi", "n_clicks"),
