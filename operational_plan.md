@@ -1,6 +1,6 @@
 # Operational plan — XRF-only visualizer (Dash / Jupyter / JAX)
 
-> **Status:** requirements implemented — M0–M11 completed 2026-11-10/12 (M3–M11 evidence in `timeline.md`).
+> **Status:** requirements implemented — M0–M12 completed 2026-11-10/12 (M3–M12 evidence in `timeline.md`).
 > **Remaining:** user-side container tests, GPU validation, deferred items in Section 7.
 > **Repository path seen by Hermes:** `/workspace/exchange/dash-xrf-visualizer`.
 > M0 (read-only audit, 2026-11-10) verified the legacy code and the user-supplied example data; findings are recorded in `scientific_notes.md` and `timeline.md`. The decisions explicitly fixed below must not be reopened unnecessarily.
@@ -158,6 +158,7 @@ Tree is an understandable **proposal**, not an instruction to create empty files
 | **M9 — Callback behavior + notebook compatibility** ✅ 2026-11-12 | Selection buttons use the actual callback trigger instead of stale `relayoutData`; figure callbacks retain live Input refresh and use ordered Input/State arguments; notebook example uses Dash 4.x `jupyter_mode="inline"` | HTTP callback regressions cover ROI/channel zoom, explicit overrides, map limits including zero, and calibration |
 | **M10 — Numeric actions + plot zoom** ✅ 2026-11-12 | Apply ROI/interval also zoom their associated plot; Apply scale button explicitly refreshes display settings; `jupyter_mode=True` remains backward-compatible via normalization to `"inline"` | HTTP callback tests verify opposite-figure updates and axis ranges; suite: 53 passed + 1 GPU skip |
 | **M11 — Plotly interaction and shared controls** ✅ 2026-11-12 | Parse real `axis.range[n]` relayout payloads; show selected points as map markers; apply log1p to spectrum counts; gate numeric zmin/zmax on Apply scale while colormap/log stay live | HTTP tests use actual Plotly relayout keys and compare serialized figure arrays to processing results |
+| **M12 — Scale, clear, calibration** ✅ 2026-11-12 | Apply zmin/zmax to `layout.coloraxis.cmin/cmax`; Clear selection resets all stores; calibration reports and displays active m/q values | HTTP tests verify coloraxis limits, full-map/full-spectrum reset, and calibrated title/range |
 
 These are planning checkpoints, NOT evidence of work performed. Use small reversible commits only when the user authorizes writes; never push without explicit approval. Do not delete `dash-xrf-analyzer/` automatically.
 

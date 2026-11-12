@@ -107,7 +107,7 @@ been performed as part of creating these templates. Do not invent entries.
 
 ### 2026-11-12 — M10: numeric actions update both figures (completed)
 
-- **Behavior:** Apply ROI now sets the map's x/y ranges and recomputes the spectrum; Apply interval sets the spectrum's channel/energy x range and recomputes the map. Added Apply scale for an explicit display refresh; zmin/zmax remain live Inputs as well. Calibrated channel zoom bounds are mapped to energy coordinates.
+- **Behavior:** Apply ROI now sets the map's x/y ranges and recomputes the spectrum; Apply interval sets the spectrum's channel/energy x range and recomputes the map. Added Apply scale for an explicit display refresh. Calibrated channel zoom bounds are mapped to energy coordinates.
 - **Notebook compatibility:** `_XrfDash.run` maps legacy `jupyter_mode=True` to Dash 4's required string mode `"inline"`; the example already uses the string form. This means the old notebook cell can work after updating the package in `.windows-env`.
 - **Evidence:** `uv run pytest -q` → 53 passed, 1 skipped (GPU); HTTP callback assertions cover both axes, map/spectrum refresh, scale values including zero, calibration and legacy boolean mode.
 
@@ -115,4 +115,11 @@ been performed as part of creating these templates. Do not invent entries.
 
 - **Root cause:** prior tests used synthetic `xrange`/`yrange`; Plotly actually sends `xaxis.range[0]`, `xaxis.range[1]` (and corresponding y keys). The callback silently ignored these real zoom events, so it appeared to reset/retain the full plot.
 - **Fix:** accept both Plotly range-key formats; Apply ROI/interval set the associated plot ranges and update the opposite figure; selected points are overlaid on the map; log1p applies to both map and spectrum sums. `Apply scale` commits zmin/zmax; colormap and log toggle remain live.
-- **Verification:** HTTP callback tests use actual relayout keys and compare decoded Plotly map/spectrum arrays with the numerical processing results. `uv run pytest -q` → 53 passed, 1 skipped (GPU).
+- **Verification:** HTTP callback tests use actual relayout keys and compare decoded Plotly map/spectrum arrays with the numerical processing results. `uv run pytest -q` → 54 passed, 1 skipped (GPU).
+
+### 2026-11-12 — M12: scale limits, full clear, calibration visibility (completed)
+
+- **Scale root cause:** `px.imshow` uses a shared Plotly `coloraxis`; setting zmin/zmax only on the Heatmap trace did not update that scale. Apply scale now writes `coloraxis.cmin/cmax`.
+- **Clear selection:** resets point markers, ROI bounds and channel interval together, returning both plots to their full ranges.
+- **Calibration:** the spectrum axis title includes active m/q and a status line confirms the formula (or requests m if missing).
+- **Verification:** `uv run pytest -q` → 54 passed, 1 skipped (GPU); HTTP tests verify color-axis limits including zero, full-axis reset, and calibrated status/title/range.

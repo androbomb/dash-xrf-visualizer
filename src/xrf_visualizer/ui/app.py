@@ -127,10 +127,9 @@ def map_figure(cube, ch_start, ch_end, zmin=None, zmax=None,
         image = np.log1p(image)
     fig = px.imshow(image, color_continuous_scale=colorscale or "Viridis",
                     aspect="auto", labels={"x": "x (col)", "y": "y (row)", "color": "sum"})
-    if zmin is not None:  # px.imshow emits a Heatmap trace: scale limits are zmin/zmax, not cmin/cmax
-        fig.update_traces(zmin=float(zmin))
-    if zmax is not None:
-        fig.update_traces(zmax=float(zmax))
+    if zmin is not None or zmax is not None:
+        fig.update_coloraxes(cmin=float(zmin) if zmin is not None else None,
+                             cmax=float(zmax) if zmax is not None else None)
     interval = (f"{m * ch_start + (q or 0):g}–{m * ch_end + (q or 0):g} keV"
                 if m is not None else f"{ch_start}–{ch_end} ADC channels")
     fig.update_layout(title=f"Integrated over {interval}",
@@ -164,7 +163,7 @@ def spectrum_figure(cube, roi=None, points=None, m=None, q=None, channel_range=N
         spec = np.log1p(spec)
     if m is not None:
         e = calibrate(C, m, q or 0.0)
-        x, xlab = e, "E (keV)"
+        x, xlab = e, f"E (keV; m={m:g}, q={q or 0:g})"
     else:
         x, xlab = np.arange(C), "channel (ADC)"
     # go.Scatter (not px.line): px.line wants a pandas frame for plain arrays
@@ -307,6 +306,7 @@ def build_app(cube=None):
                     dbc.Col([dbc.Label("m", html_for="m"), dbc.Input(id="m", type="number", step=0.001)], width=6),
                     dbc.Col([dbc.Label("q", html_for="q"), dbc.Input(id="q", type="number", step=0.001)], width=6),
                     dbc.Col(dbc.Button("Apply calibration", id="apply-calibration", n_clicks=0, outline=True, color="info"), width=12),
+                    dbc.Col(html.Div(id="cal-msg", className="text-info small"), width=12),
                 ]),
             ]),
         ]),
@@ -391,25 +391,36 @@ def build_app(cube=None):
             return [min(s, e), max(s, e)]
         return cur
 
-    @app.callback([Output("points-store", "data"), Output("msg", "children")],
+    @app.callback([Output("points-store", "data"), Output("msg", "children"),
+                   Output("roi-store", "data"), Output("ch-store", "data")],
                   Input("apply-points", "n_clicks"), Input("clear", "n_clicks"),
                   State("pt-rows", "value"), State("pt-cols", "value"),
                   prevent_initial_call=True)
     def _set_points(n_pt, n_cl, rows_s, cols_s):
         c = state["cube"]
-        if n_cl:
-            return [], ""
+        if ctx.triggered_id == "clear":
+            H, W, C = c.shape if c is not None else (0, 0, 0)
+            return [], "", [0, H, 0, W], [0, C]
         if c is None:
-            return no_update, "Load a cube first (upload or link)"
+            return no_update, "Load a cube first (upload or link)", no_update, no_update
         H, W, _ = c.shape
         try:
             pts = [[r, c_] for r, c_ in _parse_points(rows_s, cols_s)]
             bad = [p for p in pts if not (0 <= p[0] < H and 0 <= p[1] < W)]
             if bad:
                 raise ValueError(f"point {bad[0]} out of bounds ({H}x{W})")
-            return pts, ""
+            return pts, "", no_update, no_update
         except ValueError as e:
-            return no_update, str(e)
+            return no_update, str(e), no_update, no_update
+
+    @app.callback(Output("cal-msg", "children"),
+                  Input("apply-calibration", "n_clicks"),
+                  State("m", "value"), State("q", "value"),
+                  prevent_initial_call=True)
+    def _calibration_msg(_n, m, q):
+        if m is None:
+            return "Enter m (keV/channel) to apply calibration"
+        return f"Applied: E = {m:g} × channel + {q or 0:g} keV"
 
     # --- M6: file loading (upload / link / change) ---------------------------
     @app.callback([Output("load-msg", "children"), Output("cube-name", "children"),

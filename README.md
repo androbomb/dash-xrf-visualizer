@@ -42,6 +42,9 @@ parts were removed by decision; the custom CHNet raw reader is deferred.
 - M11 (Plotly interactions) completed 2026-11-12: parse Plotly's actual
   `xaxis.range[0]` relayout keys, show selected points on the map, and apply
   log1p to spectrum counts as well as map counts.
+- M12 (scale, clear, calibration) completed 2026-11-12: zmin/zmax apply to
+  Plotly's shared color axis; Clear selection resets points, ROI and channels;
+  calibration confirms and displays the active m/q values.
 
 ## Setup (verified 2026-11-10)
 
@@ -99,6 +102,8 @@ host, 2026-11-10). GPU is an opt-in, NOT TESTED variant —
   The Dash wrapper accepts the legacy boolean notebook mode for compatibility.
 - M11: Plotly zoom relayout payloads use `axis.range[n]`; selected map points
   are overlaid on the map, and the log checkbox transforms both plotted sums.
+- M12: Apply scale commits `coloraxis.cmin/cmax`; Clear selection restores both
+  plots to full bounds; calibration shows the active formula on the spectrum.
 - `example.ipynb`: set `path_to_file`, then `build_app(cube)` and
   `app.run(jupyter_mode="inline")` (Dash 4.x); `app.run()` also works from a terminal.
 

@@ -152,9 +152,12 @@ def _cb(app, marker):
 def _http_callback(app, key, inputs, states, changed):
     spec = app.callback_map[key]
     output = spec["output"]
+    outputs = ([{"id": item.component_id, "property": item.component_property}
+                for item in output] if isinstance(output, (list, tuple)) else
+               {"id": output.component_id, "property": output.component_property})
     body = {
         "output": key,
-        "outputs": {"id": output.component_id, "property": output.component_property},
+        "outputs": outputs,
         "inputs": [{**item, "value": inputs.get(f"{item['id']}.{item['property']}",
                            0 if item["property"] == "n_clicks" else [] if item["id"] == "log" else None)}
                    for item in spec["inputs"]],
@@ -165,7 +168,10 @@ def _http_callback(app, key, inputs, states, changed):
     }
     response = app.server.test_client().post("/_dash-update-component", json=body)
     assert response.status_code == 200, response.get_data(as_text=True)
-    return response.json["response"][output.component_id][output.component_property]
+    result = response.json["response"]
+    if isinstance(output, (list, tuple)):
+        return tuple(result.get(item.component_id, {}).get(item.component_property) for item in output)
+    return result[output.component_id][output.component_property]
 
 
 def _plotly_array(value):
@@ -231,7 +237,8 @@ def test_http_map_controls_and_calibration(cube):
     scale_states = {**states, "zmin.value": 0, "zmax.value": 10}
     fig = _http_callback(app, "map.figure", {**base, "apply-scale.n_clicks": 1},
                          scale_states, "apply-scale.n_clicks")
-    assert fig["data"][0]["zmin"] == 0 and fig["data"][0]["zmax"] == 10
+    assert fig["layout"]["coloraxis"]["cmin"] == 0
+    assert fig["layout"]["coloraxis"]["cmax"] == 10
     calibrated = _http_callback(app, "map.figure",
         {**base, "apply-calibration.n_clicks": 1}, {"m.value": 0.5, "q.value": 1},
         "apply-calibration.n_clicks")
@@ -240,9 +247,41 @@ def test_http_map_controls_and_calibration(cube):
         {"roi-store.data": [0, H, 0, W], "points-store.data": [], "ch-store.data": [0, C],
          "log.value": ["log"], "apply-calibration.n_clicks": 1, "gen.data": 0},
         {"m.value": 0.5, "q.value": 1}, "apply-calibration.n_clicks")
-    assert spectrum["layout"]["xaxis"]["title"]["text"] == "E (keV)"
+    assert spectrum["layout"]["xaxis"]["title"]["text"] == "E (keV; m=0.5, q=1)"
     assert spectrum["layout"]["xaxis"]["range"] == [0.75, 256.75]
     assert spectrum["layout"]["yaxis"]["title"]["text"] == "log1p(sum counts)"
+    message = _http_callback(app, "cal-msg.children",
+        {"apply-calibration.n_clicks": 1}, {"m.value": 0.5, "q.value": 1},
+        "apply-calibration.n_clicks")
+    assert message == "Applied: E = 0.5 × channel + 1 keV"
+
+
+def test_clear_selection_resets_both_plots(cube):
+    app = build_app(cube)
+    key = next(k for k in app.callback_map if "points-store.data" in k)
+    selections = _http_callback(app, key,
+        {"apply-points.n_clicks": 1, "clear.n_clicks": 0},
+        {"pt-rows.value": "2", "pt-cols.value": "3"}, "apply-points.n_clicks")
+    assert selections[0] == [[2, 3]]
+
+    cleared = _http_callback(app, key,
+        {"apply-points.n_clicks": 1, "clear.n_clicks": 1},
+        {"pt-rows.value": "2", "pt-cols.value": "3"}, "clear.n_clicks")
+    assert cleared == ([], "", [0, H, 0, W], [0, C])
+    mapfig = _http_callback(app, "map.figure",
+        {"ch-store.data": cleared[3], "roi-store.data": cleared[2],
+         "points-store.data": cleared[0], "colorscale.value": "Viridis", "log.value": [],
+         "apply-scale.n_clicks": 0, "apply-calibration.n_clicks": 0, "gen.data": 0},
+        {"m.value": None, "q.value": None, "zmin.value": None, "zmax.value": None}, "points-store.data")
+    assert len(mapfig["data"]) == 1
+    assert mapfig["layout"]["xaxis"]["range"] == [-0.5, W - 0.5]
+    spectrum = _http_callback(app, "spectrum.figure",
+        {"roi-store.data": cleared[2], "points-store.data": cleared[0],
+         "ch-store.data": cleared[3], "log.value": [],
+         "apply-calibration.n_clicks": 0, "gen.data": 0},
+        {"m.value": None, "q.value": None}, "roi-store.data")
+    assert spectrum["layout"]["title"]["text"] == f"Box: y 0–{H}, x 0–{W}"
+    assert spectrum["layout"]["xaxis"]["range"] == [-0.5, C - 0.5]
 
 
 def test_http_spectrum_zoom_updates_map_and_interval_button(cube):
@@ -288,7 +327,7 @@ def test_build_app_empty():
                      "apply-roi", "apply-points", "apply-ch", "clear", "m", "q",
                      "upload", "url", "load-url", "change-file", "load-msg",
                      "apply-calibration", "apply-scale",
-                     "cube-name", "gen"):
+                     "cal-msg", "cube-name", "gen"):
         assert expected in ids
     # figures render the empty state without a cube (raw figure, dash 4.5 single-Output)
     f = _cb(app, "map.figure")([0, 0], [0, 0, 0, 0], [], "Viridis", [], 0, 0, 0,

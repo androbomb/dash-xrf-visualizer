@@ -1,7 +1,7 @@
 # XRF-only visualizer — project to-do
 
 > Future requirements are user decisions, not verified legacy implementation.
-> M0–M11 completed 2026-11-10/12 (evidence in `timeline.md`).
+> M0–M12 completed 2026-11-10/12 (evidence in `timeline.md`).
 
 ## Now — M1 baseline + approved docs (completed 2026-11-10)
 
@@ -30,6 +30,7 @@
 - [x] M9 — Callback behavior + Dash 4 notebook compatibility: route ROI/channel changes by the actual triggering component (not stale `relayoutData`), preserve live figure refresh for zoom/selections and display controls, use `jupyter_mode="inline"`. Evidence: HTTP callback tests cover zoom→ROI→spectrum, explicit ROI override, spectrum zoom→map, explicit interval override, zmin/zmax including zero, and Apply calibration.
 - [x] M10 — Follow-up UI action behavior: Apply ROI sets map axes and spectrum ROI; Apply interval sets spectrum axes and map interval; Apply scale explicitly refreshes color limits; legacy `jupyter_mode=True` is normalized to Dash 4's `"inline"`. Evidence: HTTP callback tests plus mode-normalization test.
 - [x] M11 — Plotly interactions and shared display behavior: accept actual `axis.range[n]` relayout payloads; overlay selected points on the map; apply log1p to map and spectrum counts; zmin/zmax are committed by Apply scale while colormap/log remain live. Evidence: HTTP callback test with real relayout keys and bit-exact map/spectrum data assertions.
+- [x] M12 — Scale/clear/calibration follow-up: apply zmin/zmax to Plotly's shared `coloraxis`; Clear selection resets points, ROI and channel interval; calibration displays a confirmation and active m/q. Evidence: HTTP callback tests verify coloraxis limits, all reset stores/axes, and calibration status/title/range.
 
 ## Later — not executable in Hermes' current environment
 
