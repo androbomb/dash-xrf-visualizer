@@ -1,7 +1,7 @@
 # XRF-only visualizer — project to-do
 
 > Future requirements are user decisions, not verified legacy implementation.
-> M0–M8 completed 2026-11-10/12 (evidence in `timeline.md`).
+> M0–M9 completed 2026-11-10/12 (evidence in `timeline.md`).
 
 ## Now — M1 baseline + approved docs (completed 2026-11-10)
 
@@ -27,6 +27,7 @@
 - [x] M6 — Empty start + file loading: `build_app(cube=None)`; upload (`.npz`/`.h5`/`.npy`) or http(s) link in the UI (500 MB cap, magic-byte sniffing); `sniff_format`/`load_cube_bytes`/`download_cube` in `data/`; `XRF_CUBE` now optional in all containers (empty app when unset); markdown synced (README, how_to_deploy_*, container READMEs, plan, timeline). Evidence: 49 passed + 1 GPU skip; empty-app E2E over HTTP (upload → map bit-exact vs `map_from_channels`, bad link → clear error + state untouched, change-file → cleared).
 - [x] M7 — UI fix + legacy look: (a) dash 4.5.0 return convention fixed — with a single `Output` the renderer sends `outputs` as a single object and the callback value is assigned as-is, so callbacks return the **raw value** (the previous `[value]` wrap double-wrapped the stores: `[[...]]` → 500 in `_spec_figure`/`_map_figure` on real WSLC traffic, figures came back as `[fig]` = "file not loaded"); (b) legacy look ported per user request — `dash-bootstrap-components` (DARKLY theme, `#4196B4` navbar, fluid container, 5/7 columns) added as a dependency. Evidence: 49 passed + 1 GPU skip; HTTP E2E using the real renderer body format (single-object `outputs`): initial figures 200 + DICT + bit-exact, zoom → flat stores (`[9,20,10,40]`, `[100,120]`), post-zoom figures bit-exact, double-click reset, empty state no 500.
 - [x] M8 — UI selection and calibration clarity: aligned map controls, 2×2 ROI fields, wider rows/cols and m/q, explicit “Apply calibration” button; figure titles show active map interval (ADC or calibrated keV) and spectrum ROI/points. Calibration remains plot-axis-only. Evidence: 49 passed + 1 GPU skip; title/calibration assertions added.
+- [x] M9 — Callback behavior + Dash 4 notebook compatibility: route ROI/channel changes by the actual triggering component (not stale `relayoutData`), preserve live figure refresh for zoom/selections and display controls, use `jupyter_mode="inline"`. Evidence: HTTP callback tests cover zoom→ROI→spectrum, explicit ROI override, spectrum zoom→map, explicit interval override, zmin/zmax including zero, and Apply calibration.
 
 ## Later — not executable in Hermes' current environment
 

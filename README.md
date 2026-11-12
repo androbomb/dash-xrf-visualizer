@@ -32,6 +32,10 @@ parts were removed by decision; the custom CHNet raw reader is deferred.
   horizontal map controls, square ROI inputs, wider point/calibration fields,
   explicit calibration button, and plot titles showing integrated channel/energy
   range and spectrum selection. Calibration changes only the plotted X axis.
+- M9 (callback behavior + notebook compatibility) completed 2026-11-12: explicit
+  selection buttons now take precedence over stale graph zoom state; browser-level
+  callback tests cover ROI/interval propagation, color limits and calibration.
+  Dash 4.x notebooks use `jupyter_mode="inline"` (not boolean `True`).
 
 ## Setup (verified 2026-11-10)
 
@@ -85,7 +89,7 @@ host, 2026-11-10). GPU is an opt-in, NOT TESTED variant —
   box/points. “Apply calibration” rescales only the plotted X axis; XRF arrays
   and reductions are unchanged.
 - `example.ipynb`: set `path_to_file`, then `build_app(cube)` and
-  `app.run(jupyter_mode=True)`; `app.run()` also works from a terminal.
+  `app.run(jupyter_mode="inline")` (Dash 4.x); `app.run()` also works from a terminal.
 
 ## File loading (M6, implemented 2026-11-11)
 

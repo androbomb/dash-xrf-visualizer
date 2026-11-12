@@ -135,6 +135,84 @@ def _cb(app, marker):
     raise KeyError(marker)
 
 
+def _http_callback(app, key, inputs, states, changed):
+    spec = app.callback_map[key]
+    output = spec["output"]
+    body = {
+        "output": key,
+        "outputs": {"id": output.component_id, "property": output.component_property},
+        "inputs": [{**item, "value": inputs[f"{item['id']}.{item['property']}"]}
+                   for item in spec["inputs"]],
+        "state": [{**item, "value": states[f"{item['id']}.{item['property']}"]}
+                  for item in spec["state"]],
+        "changedPropIds": [changed],
+    }
+    response = app.server.test_client().post("/_dash-update-component", json=body)
+    assert response.status_code == 200, response.get_data(as_text=True)
+    return response.json["response"][output.component_id][output.component_property]
+
+
+def test_http_selection_apply_and_figure_refresh(cube):
+    app = build_app(cube)
+    roi = _http_callback(app, "roi-store.data",
+        {"map.relayoutData": {"xrange": [2, 5], "yrange": [1, 3]}, "apply-roi.n_clicks": 0},
+        {"roi-store.data": [0, H, 0, W], "roi-y0.value": 10, "roi-y1.value": 20,
+         "roi-x0.value": 30, "roi-x1.value": 40}, "map.relayoutData")
+    assert roi == [1, 3, 2, 5]
+    spectrum = _http_callback(app, "spectrum.figure",
+        {"roi-store.data": roi, "points-store.data": [], "apply-calibration.n_clicks": 0,
+         "gen.data": 0}, {"m.value": None, "q.value": None}, "roi-store.data")
+    assert spectrum["layout"]["title"]["text"] == "Box: y 1–3, x 2–5"
+
+    # A stale zoom must not override the explicit numeric ROI button.
+    roi = _http_callback(app, "roi-store.data",
+        {"map.relayoutData": {"xrange": [2, 5], "yrange": [1, 3]}, "apply-roi.n_clicks": 1},
+        {"roi-store.data": [1, 3, 2, 5], "roi-y0.value": 7, "roi-y1.value": 9,
+         "roi-x0.value": 11, "roi-x1.value": 13}, "apply-roi.n_clicks")
+    assert roi == [7, 9, 11, 13]
+
+
+def test_http_map_controls_and_calibration(cube):
+    app = build_app(cube)
+    base = {"ch-store.data": [0, C], "zmin.value": None, "zmax.value": None,
+            "colorscale.value": "Viridis", "log.value": [],
+            "apply-calibration.n_clicks": 0, "gen.data": 0}
+    states = {"m.value": None, "q.value": None}
+    fig = _http_callback(app, "map.figure", {**base, "zmin.value": 0, "zmax.value": 10},
+                         states, "zmin.value")
+    assert fig["data"][0]["zmin"] == 0 and fig["data"][0]["zmax"] == 10
+    calibrated = _http_callback(app, "map.figure",
+        {**base, "apply-calibration.n_clicks": 1}, {"m.value": 0.5, "q.value": 1},
+        "apply-calibration.n_clicks")
+    assert calibrated["layout"]["title"]["text"] == "Integrated over 1–257 keV"
+    spectrum = _http_callback(app, "spectrum.figure",
+        {"roi-store.data": [0, H, 0, W], "points-store.data": [],
+         "apply-calibration.n_clicks": 1, "gen.data": 0},
+        {"m.value": 0.5, "q.value": 1}, "apply-calibration.n_clicks")
+    assert spectrum["layout"]["xaxis"]["title"]["text"] == "E (keV)"
+
+
+def test_http_spectrum_zoom_updates_map_and_interval_button(cube):
+    app = build_app(cube)
+    channels = _http_callback(app, "ch-store.data",
+        {"spectrum.relayoutData": {"xrange": [100, 120]}, "apply-ch.n_clicks": 0},
+        {"ch-store.data": [0, C], "ch-s.value": 0, "ch-e.value": C},
+        "spectrum.relayoutData")
+    assert channels == [100, 120]
+    mapped = _http_callback(app, "map.figure",
+        {"ch-store.data": channels, "zmin.value": None, "zmax.value": None,
+         "colorscale.value": "Viridis", "log.value": [],
+         "apply-calibration.n_clicks": 0, "gen.data": 0},
+        {"m.value": None, "q.value": None}, "ch-store.data")
+    assert mapped["layout"]["title"]["text"] == "Integrated over 100–120 ADC channels"
+
+    channels = _http_callback(app, "ch-store.data",
+        {"spectrum.relayoutData": {"xrange": [100, 120]}, "apply-ch.n_clicks": 1},
+        {"ch-store.data": [100, 120], "ch-s.value": 10, "ch-e.value": 20},
+        "apply-ch.n_clicks")
+    assert channels == [10, 20]
+
+
 @pytest.fixture
 def empty_app():
     return build_app(None)

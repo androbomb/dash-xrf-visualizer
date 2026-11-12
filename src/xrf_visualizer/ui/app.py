@@ -32,7 +32,7 @@ import dash_bootstrap_components as dbc
 import numpy as np
 import plotly.express as px
 import plotly.graph_objects as go
-from dash import Dash, Input, Output, State, dcc, html, no_update
+from dash import Dash, Input, Output, State, ctx, dcc, html, no_update
 
 from ..data import download_cube, load_cube_bytes
 from ..processing import (
@@ -112,9 +112,9 @@ def map_figure(cube, ch_start, ch_end, zmin=None, zmax=None,
         image = np.log1p(image)
     fig = px.imshow(image, color_continuous_scale=colorscale or "Viridis",
                     aspect="auto", labels={"x": "x (col)", "y": "y (row)", "color": "sum"})
-    if zmin:  # px.imshow emits a Heatmap trace: scale limits are zmin/zmax, not cmin/cmax
+    if zmin is not None:  # px.imshow emits a Heatmap trace: scale limits are zmin/zmax, not cmin/cmax
         fig.update_traces(zmin=float(zmin))
-    if zmax:
+    if zmax is not None:
         fig.update_traces(zmax=float(zmax))
     interval = (f"{m * ch_start + (q or 0):g}–{m * ch_end + (q or 0):g} keV"
                 if m is not None else f"{ch_start}–{ch_end} ADC channels")
@@ -286,8 +286,8 @@ def build_app(cube=None):
                   Input("ch-store", "data"),
                   Input("zmin", "value"), Input("zmax", "value"),
                   Input("colorscale", "value"), Input("log", "value"),
-                  Input("apply-calibration", "n_clicks"), State("m", "value"), State("q", "value"),
-                  Input("gen", "data"))
+                  Input("apply-calibration", "n_clicks"), Input("gen", "data"),
+                  State("m", "value"), State("q", "value"))
     def _map_figure(ch, zmin, zmax, cscale, log, _n_cal, _gen, m, q):
         c = state["cube"]
         if c is None:
@@ -300,8 +300,8 @@ def build_app(cube=None):
 
     @app.callback(Output("spectrum", "figure"),
                   Input("roi-store", "data"), Input("points-store", "data"),
-                  Input("apply-calibration", "n_clicks"), State("m", "value"), State("q", "value"),
-                  Input("gen", "data"))
+                  Input("apply-calibration", "n_clicks"), Input("gen", "data"),
+                  State("m", "value"), State("q", "value"))
     def _spec_figure(roi, pts, _n_cal, _gen, m, q):
         c = state["cube"]
         if c is None:
@@ -325,11 +325,11 @@ def build_app(cube=None):
         if c is None:
             return cur
         H, W, _ = c.shape
-        if rl:
+        if ctx.triggered_id == "map":
             r = _roi_from_relayout(rl, H, W)
             if r is not None:
                 return r
-        if n:
+        elif ctx.triggered_id == "apply-roi":
             return _clamp_roi(H, W, y0, y1, x0, x1)
         return cur
 
@@ -343,11 +343,11 @@ def build_app(cube=None):
         if c is None:
             return cur
         C = c.shape[2]
-        if rl:
+        if ctx.triggered_id == "spectrum":
             r = _ch_from_relayout(rl, C)
             if r is not None:
                 return r
-        if n:
+        elif ctx.triggered_id == "apply-ch":
             s = max(0, min(int(s or 0), C))
             e = max(0, min(int(e or C), C))
             return [min(s, e), max(s, e)]

@@ -98,3 +98,9 @@ been performed as part of creating these templates. Do not invent entries.
 - **Figure context:** map title states the integrated ADC channel range or its calibrated keV range; spectrum title reports the active ROI box or selected points. Calibration remains a plot-axis rescaling (`E = m·channel + q`) and does not change XRF samples or reduction results.
 - **Verification:** `uv run pytest -q` → 49 passed, 1 skipped (GPU); added checks for map interval/unit titles and spectrum ROI/point titles.
 - **Next:** rebuild and visually inspect the WSLC container as part of the user's existing deployment workflow.
+
+### 2026-11-12 — M9: Dash callback triggers and notebook mode (completed)
+
+- **Root causes:** explicit Apply ROI/interval callbacks preferred non-empty stale `relayoutData`; Dash callback declarations had State values interleaved before later Inputs, obscuring/incorrectly aligning callback parameters; the example passed boolean `jupyter_mode=True`, rejected by Dash 4.5 (requires string mode).
+- **Fix:** branch ROI/channel changes on `ctx.triggered_id`; keep every Input before State and callback arguments in Dash's input-then-state order; include zero as a valid zmin/zmax; update notebook/README to `jupyter_mode="inline"`.
+- **Evidence:** HTTP callback tests verify graph zoom→opposite figure update, numeric apply overrides old zoom, zmin=0/zmax apply, and calibration refreshes both plotted axes; `uv run pytest -q` → 52 passed, 1 skipped (GPU).
