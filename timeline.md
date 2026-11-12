@@ -91,3 +91,10 @@ been performed as part of creating these templates. Do not invent entries.
 - **Evidence:** pytest → 49 passed, 1 skipped (GPU, NOT TESTED) in ~24 s. New HTTP E2E replicating the exact WSLC scenario with the **real renderer body format** (single-object `outputs` for single-Output callbacks): preloaded real cube (76x177x500) → initial map/spectrum 200, figure is a dict, bit-exact vs `map_from_channels`/`spectrum_from_roi`; map zoom `[10.2,39.8]x[19.5,9.4]` → `roi-store` FLAT `[9,20,10,40]` (the step that 500'd in the container) → post-zoom spectrum bit-exact; spectrum zoom → `ch-store` FLAT `[100,120]` → post-zoom map bit-exact; double-click → ROI reset `[0,76,0,177]`; empty-state app: spurious relayouts → 200, figures are dicts, no 500.
 - **Limitations:** visual browser check still user-side (no Chromium in Hermes); container images must be **rebuilt** (new dependency + fixed code) — commands unchanged (`wslc build` then `wslc run -p 8765:8765 ...`).
 - **Next:** user rebuilds the WSLC image and retests (preload + upload + zoom); Docker/Apptainer rebuilds when the user gets to them.
+
+### 2026-11-12 — M8: selection labels and control layout (completed)
+
+- **UI:** compact horizontal map controls; channel fields renamed “ch begin”/“ch end”; ROI inputs arranged x0/x1 then y0/y1; rows/cols and m/q aligned with wider inputs. Added an “Apply calibration” button and concise formula label.
+- **Figure context:** map title states the integrated ADC channel range or its calibrated keV range; spectrum title reports the active ROI box or selected points. Calibration remains a plot-axis rescaling (`E = m·channel + q`) and does not change XRF samples or reduction results.
+- **Verification:** `uv run pytest -q` → 49 passed, 1 skipped (GPU); added checks for map interval/unit titles and spectrum ROI/point titles.
+- **Next:** rebuild and visually inspect the WSLC container as part of the user's existing deployment workflow.

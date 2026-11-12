@@ -70,6 +70,8 @@ def test_map_figure_matches_golden(cube, golden):
     assert z.dtype == np.float64
     fig2 = map_figure(cube, 0, C, zmin=1, zmax=1e6, colorscale="Hot", log=True)
     assert np.asarray(fig2.data[0]["z"]).shape == (H, W)
+    assert "100–120 ADC channels" in fig.layout.title.text
+    assert "7.96–9.452 keV" in map_figure(cube, 100, 120, m=0.0746, q=0.5).layout.title.text
 
 
 def test_spectrum_figure_matches_golden(cube, golden):
@@ -81,6 +83,8 @@ def test_spectrum_figure_matches_golden(cube, golden):
     cal = np.asarray(spectrum_figure(cube, roi=[0, H, 0, W], m=0.0746, q=0.5).data[0]["x"])
     np.testing.assert_allclose(cal[0], 0.5, rtol=1e-12)
     np.testing.assert_allclose(cal[-1], 0.5 + 0.0746 * (C - 1), rtol=1e-12)
+    assert spectrum_figure(cube, roi=[10, 20, 30, 40]).layout.title.text == "Box: y 10–20, x 30–40"
+    assert "Points" in spectrum_figure(cube, points=[[10, 30]]).layout.title.text
 
 
 def test_roi_from_relayout():
@@ -142,12 +146,13 @@ def test_build_app_empty():
     for expected in ("map", "spectrum", "roi-store", "ch-store", "points-store",
                      "apply-roi", "apply-points", "apply-ch", "clear", "m", "q",
                      "upload", "url", "load-url", "change-file", "load-msg",
+                     "apply-calibration",
                      "cube-name", "gen"):
         assert expected in ids
     # figures render the empty state without a cube (raw figure, dash 4.5 single-Output)
-    f = _cb(app, "map.figure")([0, 0], None, None, "Viridis", [], 0)
+    f = _cb(app, "map.figure")([0, 0], None, None, "Viridis", [], 0, 0, None, None)
     assert not f.data
-    f = _cb(app, "spectrum.figure")([0, 0, 0, 0], [], None, None, 0)
+    f = _cb(app, "spectrum.figure")([0, 0, 0, 0], [], 0, 0, None, None)
     assert not f.data
 
 
@@ -158,7 +163,7 @@ def test_on_load_upload(empty_app, cube):
     assert "Loaded synthetic_cube.npz" in out[0]
     assert out[4] == 1  # gen bumped
     # map figure now matches the processing layer for the full channel range
-    m = _cb(empty_app, "map.figure")([0, C], None, None, "Viridis", [], 1)
+    m = _cb(empty_app, "map.figure")([0, C], None, None, "Viridis", [], 0, 1, None, None)
     z = np.asarray(m.data[0]["z"])
     from xrf_visualizer.processing import map_from_channels
     np.testing.assert_array_equal(z, map_from_channels(cube, 0, C))
@@ -172,7 +177,7 @@ def test_on_load_upload_bad_bytes(empty_app, cube):
     assert out[0].startswith("Upload failed")
     assert out[4] is no_update
     # state untouched: figures still empty
-    m = _cb(empty_app, "map.figure")([0, C], None, None, "Viridis", [], 0)
+    m = _cb(empty_app, "map.figure")([0, C], None, None, "Viridis", [], 0, 0, None, None)
     assert not m.data
 
 

@@ -28,6 +28,10 @@ parts were removed by decision; the custom CHNet raw reader is deferred.
   wrap double-wrapped the stores and 500'd on real WSLC traffic) and
   ported the legacy `dash-bootstrap-components` look (DARKLY theme,
   `#4196B4` navbar, 5/7 columns).
+- M8 (selection labels + controls layout) completed 2026-11-12: compact
+  horizontal map controls, square ROI inputs, wider point/calibration fields,
+  explicit calibration button, and plot titles showing integrated channel/energy
+  range and spectrum selection. Calibration changes only the plotted X axis.
 
 ## Setup (verified 2026-11-10)
 
@@ -75,6 +79,11 @@ host, 2026-11-10). GPU is an opt-in, NOT TESTED variant —
   (rows + cols), numeric channel interval. Manual calibration panel
   (`m`, `q`); invalid points report an error message and keep the previous
   selection. All selections are clamped before reaching `processing/`.
+- M8: map controls share a horizontal row; ROI inputs use a 2×2 layout
+  (x0/x1, then y0/y1); point and calibration fields are wider. Plot titles
+  report the integrated interval (ADC or calibrated keV) and active spectrum
+  box/points. “Apply calibration” rescales only the plotted X axis; XRF arrays
+  and reductions are unchanged.
 - `example.ipynb`: set `path_to_file`, then `build_app(cube)` and
   `app.run(jupyter_mode=True)`; `app.run()` also works from a terminal.
 

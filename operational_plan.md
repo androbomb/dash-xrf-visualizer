@@ -1,6 +1,6 @@
 # Operational plan — XRF-only visualizer (Dash / Jupyter / JAX)
 
-> **Status:** requirements implemented — M0–M7 completed 2026-11-10/11 (M3–M7 evidence in `timeline.md`).
+> **Status:** requirements implemented — M0–M8 completed 2026-11-10/12 (M3–M8 evidence in `timeline.md`).
 > **Remaining:** user-side container tests, GPU validation, deferred items in Section 7.
 > **Repository path seen by Hermes:** `/workspace/exchange/dash-xrf-visualizer`.
 > M0 (read-only audit, 2026-11-10) verified the legacy code and the user-supplied example data; findings are recorded in `scientific_notes.md` and `timeline.md`. The decisions explicitly fixed below must not be reopened unnecessarily.
@@ -154,6 +154,7 @@ Tree is an understandable **proposal**, not an instruction to create empty files
 | **M5 — Cleanup + deploy docs** ✅ 2026-11-11 | AIRES/TF absence grep (0 hits), `deploy/{docker,wslc,apptainer}/` recipes **NOT TESTED**, final README | User tests unexecutable runtimes; no unapproved deletions |
 | **M6 — Empty start + file loading** ✅ 2026-11-11 | `build_app(None)`; upload (`.npz`/`.h5`/`.npy`) or http(s) link in the UI; `sniff_format`/`load_cube_bytes`/`download_cube`; `XRF_CUBE` optional in containers | 49 passed + 1 GPU skip; empty-app E2E bit-exact via HTTP (upload → map vs `map_from_channels`) |
 | **M7 — UI fix + legacy look** ✅ 2026-11-11 | dash 4.5 return convention fixed (single `Output` → raw value; the `[value]` wrap double-wrapped stores → WSLC 500); legacy dbc look ported (DARKLY, navbar `#4196B4`, 5/7 columns); `dash-bootstrap-components` added | 49 passed + 1 GPU skip; HTTP E2E with the real renderer contract (figure DICTs, flat stores, zoom → recompute bit-exact) |
+| **M8 — Selection labels + controls layout** ✅ 2026-11-12 | Horizontal map controls, 2×2 ROI grid, wider rows/cols and calibration inputs, explicit calibration action; plot titles expose selected map interval and spectrum ROI/points; calibration remains X-axis-only | 49 passed + 1 GPU skip; assertions for interval units, ROI/point titles and calibrated axis |
 
 These are planning checkpoints, NOT evidence of work performed. Use small reversible commits only when the user authorizes writes; never push without explicit approval. Do not delete `dash-xrf-analyzer/` automatically.
 

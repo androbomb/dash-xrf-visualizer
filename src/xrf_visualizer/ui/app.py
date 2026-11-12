@@ -105,18 +105,21 @@ def _parse_points(rows_s, cols_s):
 # ------------------------------------------------------------ figure builders
 
 def map_figure(cube, ch_start, ch_end, zmin=None, zmax=None,
-               colorscale="Viridis", log=False):
+               colorscale="Viridis", log=False, m=None, q=None):
     """Current map: plain float64 channel sum, display options applied."""
-    m = map_from_channels(cube, ch_start, ch_end)
+    image = map_from_channels(cube, ch_start, ch_end)
     if log:  # shortcut: log via data transform; zmin/zmax then apply to log1p values
-        m = np.log1p(m)
-    fig = px.imshow(m, color_continuous_scale=colorscale or "Viridis",
+        image = np.log1p(image)
+    fig = px.imshow(image, color_continuous_scale=colorscale or "Viridis",
                     aspect="auto", labels={"x": "x (col)", "y": "y (row)", "color": "sum"})
     if zmin:  # px.imshow emits a Heatmap trace: scale limits are zmin/zmax, not cmin/cmax
         fig.update_traces(zmin=float(zmin))
     if zmax:
         fig.update_traces(zmax=float(zmax))
-    fig.update_layout(margin=dict(l=40, r=10, t=30, b=30))
+    interval = (f"{m * ch_start + (q or 0):g}–{m * ch_end + (q or 0):g} keV"
+                if m is not None else f"{ch_start}–{ch_end} ADC channels")
+    fig.update_layout(title=f"Integrated over {interval}",
+                      margin=dict(l=40, r=10, t=55, b=30))
     return fig
 
 
@@ -128,18 +131,20 @@ def spectrum_figure(cube, roi=None, points=None, m=None, q=None):
     H, W, C = cube.shape
     if points:
         spec = spectrum_from_points(cube, [p[0] for p in points], [p[1] for p in points])
+        selection = "Points: " + "; ".join(f"(row {y}, col {x})" for y, x in points)
     else:
         y0, y1, x0, x1 = roi if roi else [0, H, 0, W]
         spec = spectrum_from_roi(cube, y0, y1, x0, x1)
-    if m:
+        selection = f"Box: y {y0}–{y1}, x {x0}–{x1}"
+    if m is not None:
         e = calibrate(C, m, q or 0.0)
         x, xlab = e, "E (keV)"
     else:
         x, xlab = np.arange(C), "channel (ADC)"
     # go.Scatter (not px.line): px.line wants a pandas frame for plain arrays
     fig = go.Figure(go.Scatter(x=x, y=spec, mode="lines"))
-    fig.update_layout(xaxis_title=xlab, yaxis_title="sum counts",
-                      margin=dict(l=50, r=10, t=30, b=30))
+    fig.update_layout(title=selection, xaxis_title=xlab, yaxis_title="sum counts",
+                      margin=dict(l=50, r=10, t=55, b=30))
     return fig
 
 
@@ -227,20 +232,19 @@ def build_app(cube=None):
                 dbc.Col(html.H4("XRF Map", style={"color": _ACCENT}),
                         width={"size": 6, "offset": 3}),
                 dcc.Graph(id="map", style={"height": "60vh"}),
-                html.Div(className="row", children=[
-                    html.Label("zmin"), dbc.Input(id="zmin", type="number", style={"width": 70}),
-                    html.Label("zmax"), dbc.Input(id="zmax", type="number", style={"width": 70}),
-                    dcc.Dropdown(id="colorscale",
+                dbc.Row(className="g-2 align-items-center mb-2", children=[
+                    dbc.Col([dbc.Label("zmin", html_for="zmin"), dbc.Input(id="zmin", type="number")], width=2),
+                    dbc.Col([dbc.Label("zmax", html_for="zmax"), dbc.Input(id="zmax", type="number")], width=2),
+                    dbc.Col([dbc.Label("colormap", html_for="colorscale"), dcc.Dropdown(id="colorscale",
                                  options=[{"label": n, "value": n} for n in _COLORSCALES],
-                                 value="Viridis", style={"width": 110, "marginLeft": "8px"}),
-                    dcc.Checklist(id="log", options=[{"label": "log", "value": "log"}], value=[]),
+                                 value="Viridis")], width=5),
+                    dbc.Col(dcc.Checklist(id="log", options=[{"label": "log", "value": "log"}], value=[]), width=3, className="pt-4"),
                 ]),
-                html.Div(className="row", children=[
-                    html.B("Interval -> map: "),
-                    html.Label("ch s"), dbc.Input(id="ch-s", type="number", value=0, style={"width": 70}),
-                    html.Label("ch e"), dbc.Input(id="ch-e", type="number", value=C, style={"width": 70}),
-                    dbc.Button("Apply interval", id="apply-ch", n_clicks=0,
-                               outline=True, color="info", className="ml-2"),
+                html.B("Interval → map"),
+                dbc.Row(className="g-2 align-items-end mb-2", children=[
+                    dbc.Col([dbc.Label("ch begin", html_for="ch-s"), dbc.Input(id="ch-s", type="number", value=0)], width=4),
+                    dbc.Col([dbc.Label("ch end", html_for="ch-e"), dbc.Input(id="ch-e", type="number", value=C)], width=4),
+                    dbc.Col(dbc.Button("Apply interval", id="apply-ch", n_clicks=0, outline=True, color="info"), width=4),
                 ]),
             ]),
             ### spectrum column
@@ -248,28 +252,26 @@ def build_app(cube=None):
                 dbc.Col(html.H4("XRF Spectrum", style={"color": _ACCENT}),
                         width={"size": 6, "offset": 3}),
                 dcc.Graph(id="spectrum", style={"height": "60vh"}),
-                html.Div(className="row", children=[
-                    html.B("ROI (rows y, cols x) -> spectrum: "),
-                    html.Label("y0"), dbc.Input(id="roi-y0", type="number", value=0, style={"width": 60}),
-                    html.Label("y1"), dbc.Input(id="roi-y1", type="number", value=H, style={"width": 60}),
-                    html.Label("x0"), dbc.Input(id="roi-x0", type="number", value=0, style={"width": 60}),
-                    html.Label("x1"), dbc.Input(id="roi-x1", type="number", value=W, style={"width": 60}),
-                    dbc.Button("Apply ROI", id="apply-roi", n_clicks=0,
-                               outline=True, color="info", className="ml-2"),
+                html.B("ROI (rows y, cols x) → spectrum"),
+                dbc.Row(className="g-2 mb-2", children=[
+                    dbc.Col([dbc.Label("x0", html_for="roi-x0"), dbc.Input(id="roi-x0", type="number", value=0)], width=6),
+                    dbc.Col([dbc.Label("x1", html_for="roi-x1"), dbc.Input(id="roi-x1", type="number", value=W)], width=6),
+                    dbc.Col([dbc.Label("y0", html_for="roi-y0"), dbc.Input(id="roi-y0", type="number", value=0)], width=6),
+                    dbc.Col([dbc.Label("y1", html_for="roi-y1"), dbc.Input(id="roi-y1", type="number", value=H)], width=6),
+                    dbc.Col(dbc.Button("Apply ROI", id="apply-roi", n_clicks=0, outline=True, color="info"), width=12),
                 ]),
-                html.Div(className="row", children=[
-                    html.B("Points -> spectrum: "),
-                    html.Label("rows"), dbc.Input(id="pt-rows", type="text", placeholder="10, 19", style={"width": 110}),
-                    html.Label("cols"), dbc.Input(id="pt-cols", type="text", placeholder="30, 39", style={"width": 110}),
-                    dbc.Button("Apply points", id="apply-points", n_clicks=0,
-                               outline=True, color="info", className="ml-2"),
-                    dbc.Button("Clear selection", id="clear", n_clicks=0,
-                               outline=True, color="danger", className="ml-1"),
+                html.B("Points → spectrum"),
+                dbc.Row(className="g-2 align-items-end mb-2", children=[
+                    dbc.Col([dbc.Label("rows", html_for="pt-rows"), dbc.Input(id="pt-rows", type="text", placeholder="10, 19")], width=4),
+                    dbc.Col([dbc.Label("cols", html_for="pt-cols"), dbc.Input(id="pt-cols", type="text", placeholder="30, 39")], width=4),
+                    dbc.Col(dbc.Button("Apply points", id="apply-points", n_clicks=0, outline=True, color="info"), width=4),
+                    dbc.Col(dbc.Button("Clear selection", id="clear", n_clicks=0, outline=True, color="danger"), width=12),
                 ]),
-                html.Div(className="row", children=[
-                    html.B("Calibration (keV): "),
-                    html.Label("m"), dbc.Input(id="m", type="number", step=0.001, style={"width": 70}),
-                    html.Label("q"), dbc.Input(id="q", type="number", step=0.001, style={"width": 70}),
+                html.B("Calibration (keV = m × channel + q)"),
+                dbc.Row(className="g-2 align-items-end", children=[
+                    dbc.Col([dbc.Label("m", html_for="m"), dbc.Input(id="m", type="number", step=0.001)], width=6),
+                    dbc.Col([dbc.Label("q", html_for="q"), dbc.Input(id="q", type="number", step=0.001)], width=6),
+                    dbc.Col(dbc.Button("Apply calibration", id="apply-calibration", n_clicks=0, outline=True, color="info"), width=12),
                 ]),
             ]),
         ]),
@@ -284,8 +286,9 @@ def build_app(cube=None):
                   Input("ch-store", "data"),
                   Input("zmin", "value"), Input("zmax", "value"),
                   Input("colorscale", "value"), Input("log", "value"),
+                  Input("apply-calibration", "n_clicks"), State("m", "value"), State("q", "value"),
                   Input("gen", "data"))
-    def _map_figure(ch, zmin, zmax, cscale, log, _gen):
+    def _map_figure(ch, zmin, zmax, cscale, log, _n_cal, _gen, m, q):
         c = state["cube"]
         if c is None:
             return _empty_figure("No cube loaded — upload a file or paste a link above")
@@ -293,13 +296,13 @@ def build_app(cube=None):
         if e is None or e <= (s or 0):  # stale/empty interval -> full channels
             s, e = 0, c.shape[2]
         # dash 4.5: single Output -> return the raw value (no [..] wrap)
-        return map_figure(c, s, e, zmin, zmax, cscale, bool(log))
+        return map_figure(c, s, e, zmin, zmax, cscale, bool(log), m, q)
 
     @app.callback(Output("spectrum", "figure"),
                   Input("roi-store", "data"), Input("points-store", "data"),
-                  Input("m", "value"), Input("q", "value"),
+                  Input("apply-calibration", "n_clicks"), State("m", "value"), State("q", "value"),
                   Input("gen", "data"))
-    def _spec_figure(roi, pts, m, q, _gen):
+    def _spec_figure(roi, pts, _n_cal, _gen, m, q):
         c = state["cube"]
         if c is None:
             return _empty_figure("No cube loaded")
