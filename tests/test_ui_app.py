@@ -9,6 +9,7 @@ from pathlib import Path
 
 import numpy as np
 import pytest
+from dash import Dash
 
 from xrf_visualizer.ui.app import (
     _ch_from_relayout,
@@ -61,6 +62,13 @@ def test_build_app(cube):
     for expected in ("map", "spectrum", "roi-store", "ch-store", "points-store",
                      "apply-roi", "apply-points", "apply-ch", "clear", "m", "q"):
         assert expected in ids
+
+
+def test_legacy_boolean_jupyter_mode_uses_inline(monkeypatch):
+    called = {}
+    monkeypatch.setattr(Dash, "run", lambda self, *args, **kwargs: called.update(kwargs))
+    build_app(None).run(jupyter_mode=True)
+    assert called["jupyter_mode"] == "inline"
 
 
 def test_map_figure_matches_golden(cube, golden):
@@ -161,8 +169,16 @@ def test_http_selection_apply_and_figure_refresh(cube):
     assert roi == [1, 3, 2, 5]
     spectrum = _http_callback(app, "spectrum.figure",
         {"roi-store.data": roi, "points-store.data": [], "apply-calibration.n_clicks": 0,
-         "gen.data": 0}, {"m.value": None, "q.value": None}, "roi-store.data")
+         "ch-store.data": [0, C], "gen.data": 0},
+        {"m.value": None, "q.value": None}, "roi-store.data")
     assert spectrum["layout"]["title"]["text"] == "Box: y 1–3, x 2–5"
+    mapfig = _http_callback(app, "map.figure",
+        {"ch-store.data": [0, C], "roi-store.data": roi, "zmin.value": None,
+         "zmax.value": None, "colorscale.value": "Viridis", "log.value": [],
+         "apply-scale.n_clicks": 0, "apply-calibration.n_clicks": 0, "gen.data": 0},
+        {"m.value": None, "q.value": None}, "roi-store.data")
+    assert mapfig["layout"]["xaxis"]["range"] == [1.5, 4.5]
+    assert mapfig["layout"]["yaxis"]["range"] == [2.5, 0.5]
 
     # A stale zoom must not override the explicit numeric ROI button.
     roi = _http_callback(app, "roi-store.data",
@@ -174,8 +190,10 @@ def test_http_selection_apply_and_figure_refresh(cube):
 
 def test_http_map_controls_and_calibration(cube):
     app = build_app(cube)
-    base = {"ch-store.data": [0, C], "zmin.value": None, "zmax.value": None,
+    base = {"ch-store.data": [0, C], "roi-store.data": [0, H, 0, W],
+            "zmin.value": None, "zmax.value": None,
             "colorscale.value": "Viridis", "log.value": [],
+            "apply-scale.n_clicks": 0,
             "apply-calibration.n_clicks": 0, "gen.data": 0}
     states = {"m.value": None, "q.value": None}
     fig = _http_callback(app, "map.figure", {**base, "zmin.value": 0, "zmax.value": 10},
@@ -186,10 +204,11 @@ def test_http_map_controls_and_calibration(cube):
         "apply-calibration.n_clicks")
     assert calibrated["layout"]["title"]["text"] == "Integrated over 1–257 keV"
     spectrum = _http_callback(app, "spectrum.figure",
-        {"roi-store.data": [0, H, 0, W], "points-store.data": [],
+        {"roi-store.data": [0, H, 0, W], "points-store.data": [], "ch-store.data": [0, C],
          "apply-calibration.n_clicks": 1, "gen.data": 0},
         {"m.value": 0.5, "q.value": 1}, "apply-calibration.n_clicks")
     assert spectrum["layout"]["xaxis"]["title"]["text"] == "E (keV)"
+    assert spectrum["layout"]["xaxis"]["range"] == [0.75, 256.75]
 
 
 def test_http_spectrum_zoom_updates_map_and_interval_button(cube):
@@ -201,8 +220,9 @@ def test_http_spectrum_zoom_updates_map_and_interval_button(cube):
     assert channels == [100, 120]
     mapped = _http_callback(app, "map.figure",
         {"ch-store.data": channels, "zmin.value": None, "zmax.value": None,
+         "roi-store.data": [0, H, 0, W],
          "colorscale.value": "Viridis", "log.value": [],
-         "apply-calibration.n_clicks": 0, "gen.data": 0},
+         "apply-scale.n_clicks": 0, "apply-calibration.n_clicks": 0, "gen.data": 0},
         {"m.value": None, "q.value": None}, "ch-store.data")
     assert mapped["layout"]["title"]["text"] == "Integrated over 100–120 ADC channels"
 
@@ -224,13 +244,14 @@ def test_build_app_empty():
     for expected in ("map", "spectrum", "roi-store", "ch-store", "points-store",
                      "apply-roi", "apply-points", "apply-ch", "clear", "m", "q",
                      "upload", "url", "load-url", "change-file", "load-msg",
-                     "apply-calibration",
+                     "apply-calibration", "apply-scale",
                      "cube-name", "gen"):
         assert expected in ids
     # figures render the empty state without a cube (raw figure, dash 4.5 single-Output)
-    f = _cb(app, "map.figure")([0, 0], None, None, "Viridis", [], 0, 0, None, None)
+    f = _cb(app, "map.figure")([0, 0], [0, 0, 0, 0], None, None,
+                                "Viridis", [], 0, 0, 0, None, None)
     assert not f.data
-    f = _cb(app, "spectrum.figure")([0, 0, 0, 0], [], 0, 0, None, None)
+    f = _cb(app, "spectrum.figure")([0, 0, 0, 0], [], [0, 0], 0, 0, None, None)
     assert not f.data
 
 
@@ -241,7 +262,8 @@ def test_on_load_upload(empty_app, cube):
     assert "Loaded synthetic_cube.npz" in out[0]
     assert out[4] == 1  # gen bumped
     # map figure now matches the processing layer for the full channel range
-    m = _cb(empty_app, "map.figure")([0, C], None, None, "Viridis", [], 0, 1, None, None)
+    m = _cb(empty_app, "map.figure")([0, C], [0, H, 0, W], None, None,
+                                      "Viridis", [], 0, 0, 1, None, None)
     z = np.asarray(m.data[0]["z"])
     from xrf_visualizer.processing import map_from_channels
     np.testing.assert_array_equal(z, map_from_channels(cube, 0, C))
@@ -255,7 +277,8 @@ def test_on_load_upload_bad_bytes(empty_app, cube):
     assert out[0].startswith("Upload failed")
     assert out[4] is no_update
     # state untouched: figures still empty
-    m = _cb(empty_app, "map.figure")([0, C], None, None, "Viridis", [], 0, 0, None, None)
+    m = _cb(empty_app, "map.figure")([0, C], [0, H, 0, W], None, None,
+                                      "Viridis", [], 0, 0, 0, None, None)
     assert not m.data
 
 

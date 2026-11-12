@@ -36,6 +36,9 @@ parts were removed by decision; the custom CHNet raw reader is deferred.
   selection buttons now take precedence over stale graph zoom state; browser-level
   callback tests cover ROI/interval propagation, color limits and calibration.
   Dash 4.x notebooks use `jupyter_mode="inline"` (not boolean `True`).
+- M10 (selection zoom + controls) completed 2026-11-12: Apply ROI/interval also
+  sets the corresponding plot zoom; Apply scale explicitly refreshes display
+  limits; legacy `jupyter_mode=True` is accepted as an alias for `"inline"`.
 
 ## Setup (verified 2026-11-10)
 
@@ -88,6 +91,9 @@ host, 2026-11-10). GPU is an opt-in, NOT TESTED variant —
   report the integrated interval (ADC or calibrated keV) and active spectrum
   box/points. “Apply calibration” rescales only the plotted X axis; XRF arrays
   and reductions are unchanged.
+- M10: numeric ROI/channel actions zoom the associated plot as well as update
+  the opposite plot; Apply scale is available for explicit color-limit refresh.
+  The Dash wrapper accepts the legacy boolean notebook mode for compatibility.
 - `example.ipynb`: set `path_to_file`, then `build_app(cube)` and
   `app.run(jupyter_mode="inline")` (Dash 4.x); `app.run()` also works from a terminal.
 

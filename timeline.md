@@ -104,3 +104,9 @@ been performed as part of creating these templates. Do not invent entries.
 - **Root causes:** explicit Apply ROI/interval callbacks preferred non-empty stale `relayoutData`; Dash callback declarations had State values interleaved before later Inputs, obscuring/incorrectly aligning callback parameters; the example passed boolean `jupyter_mode=True`, rejected by Dash 4.5 (requires string mode).
 - **Fix:** branch ROI/channel changes on `ctx.triggered_id`; keep every Input before State and callback arguments in Dash's input-then-state order; include zero as a valid zmin/zmax; update notebook/README to `jupyter_mode="inline"`.
 - **Evidence:** HTTP callback tests verify graph zoom→opposite figure update, numeric apply overrides old zoom, zmin=0/zmax apply, and calibration refreshes both plotted axes; `uv run pytest -q` → 52 passed, 1 skipped (GPU).
+
+### 2026-11-12 — M10: numeric actions update both figures (completed)
+
+- **Behavior:** Apply ROI now sets the map's x/y ranges and recomputes the spectrum; Apply interval sets the spectrum's channel/energy x range and recomputes the map. Added Apply scale for an explicit display refresh; zmin/zmax remain live Inputs as well. Calibrated channel zoom bounds are mapped to energy coordinates.
+- **Notebook compatibility:** `_XrfDash.run` maps legacy `jupyter_mode=True` to Dash 4's required string mode `"inline"`; the example already uses the string form. This means the old notebook cell can work after updating the package in `.windows-env`.
+- **Evidence:** `uv run pytest -q` → 53 passed, 1 skipped (GPU); HTTP callback assertions cover both axes, map/spectrum refresh, scale values including zero, calibration and legacy boolean mode.

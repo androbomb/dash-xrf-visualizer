@@ -46,6 +46,13 @@ _COLORSCALES = ("Viridis", "Plasma", "Hot", "Greys", "Jet")
 _ACCENT = "#4196B4"  # legacy infn_lightblue
 
 
+class _XrfDash(Dash):
+    def run(self, *args, **kwargs):
+        if kwargs.get("jupyter_mode") is True:
+            kwargs["jupyter_mode"] = "inline"
+        return super().run(*args, **kwargs)
+
+
 # ---------------------------------------------------------------- pure logic
 
 def _roi_from_relayout(rl, H, W):
@@ -105,7 +112,7 @@ def _parse_points(rows_s, cols_s):
 # ------------------------------------------------------------ figure builders
 
 def map_figure(cube, ch_start, ch_end, zmin=None, zmax=None,
-               colorscale="Viridis", log=False, m=None, q=None):
+               colorscale="Viridis", log=False, m=None, q=None, roi=None):
     """Current map: plain float64 channel sum, display options applied."""
     image = map_from_channels(cube, ch_start, ch_end)
     if log:  # shortcut: log via data transform; zmin/zmax then apply to log1p values
@@ -120,10 +127,14 @@ def map_figure(cube, ch_start, ch_end, zmin=None, zmax=None,
                 if m is not None else f"{ch_start}–{ch_end} ADC channels")
     fig.update_layout(title=f"Integrated over {interval}",
                       margin=dict(l=40, r=10, t=55, b=30))
+    if roi:
+        y0, y1, x0, x1 = roi
+        fig.update_layout(xaxis_range=[x0 - 0.5, x1 - 0.5],
+                          yaxis_range=[y1 - 0.5, y0 - 0.5])
     return fig
 
 
-def spectrum_figure(cube, roi=None, points=None, m=None, q=None):
+def spectrum_figure(cube, roi=None, points=None, m=None, q=None, channel_range=None):
     """Current spectrum: plain float64 pixel sum (points win over ROI).
 
     With m != 0 the x-axis is the calibrated energy axis E = m*i + q (keV).
@@ -145,6 +156,12 @@ def spectrum_figure(cube, roi=None, points=None, m=None, q=None):
     fig = go.Figure(go.Scatter(x=x, y=spec, mode="lines"))
     fig.update_layout(title=selection, xaxis_title=xlab, yaxis_title="sum counts",
                       margin=dict(l=50, r=10, t=55, b=30))
+    if channel_range:
+        start, end = channel_range
+        limits = [start - 0.5, end - 0.5]
+        if m is not None:
+            limits = [m * i + (q or 0.0) for i in limits]
+        fig.update_xaxes(range=sorted(limits))
     return fig
 
 
@@ -183,7 +200,7 @@ def build_app(cube=None):
     state = {"cube": arr,
              "name": Path(getattr(cube, "path", "") or "cube").name}
     H, W, C = arr.shape if arr is not None else (0, 0, 0)
-    app = Dash(__name__, external_stylesheets=[dbc.themes.DARKLY])
+    app = _XrfDash(__name__, external_stylesheets=[dbc.themes.DARKLY])
     app.layout = dbc.Container(fluid=True, children=[
         dbc.Row([
             dbc.Col([
@@ -237,8 +254,10 @@ def build_app(cube=None):
                     dbc.Col([dbc.Label("zmax", html_for="zmax"), dbc.Input(id="zmax", type="number")], width=2),
                     dbc.Col([dbc.Label("colormap", html_for="colorscale"), dcc.Dropdown(id="colorscale",
                                  options=[{"label": n, "value": n} for n in _COLORSCALES],
-                                 value="Viridis")], width=5),
-                    dbc.Col(dcc.Checklist(id="log", options=[{"label": "log", "value": "log"}], value=[]), width=3, className="pt-4"),
+                                 value="Viridis")], width=4),
+                    dbc.Col(dcc.Checklist(id="log", options=[{"label": "log", "value": "log"}], value=[]), width=2, className="pt-4"),
+                    dbc.Col(dbc.Button("Apply scale", id="apply-scale", n_clicks=0,
+                                       outline=True, color="info"), width=2),
                 ]),
                 html.B("Interval → map"),
                 dbc.Row(className="g-2 align-items-end mb-2", children=[
@@ -283,12 +302,13 @@ def build_app(cube=None):
     ])
 
     @app.callback(Output("map", "figure"),
-                  Input("ch-store", "data"),
+                  Input("ch-store", "data"), Input("roi-store", "data"),
                   Input("zmin", "value"), Input("zmax", "value"),
                   Input("colorscale", "value"), Input("log", "value"),
-                  Input("apply-calibration", "n_clicks"), Input("gen", "data"),
+                  Input("apply-scale", "n_clicks"), Input("apply-calibration", "n_clicks"),
+                  Input("gen", "data"),
                   State("m", "value"), State("q", "value"))
-    def _map_figure(ch, zmin, zmax, cscale, log, _n_cal, _gen, m, q):
+    def _map_figure(ch, roi, zmin, zmax, cscale, log, _n_scale, _n_cal, _gen, m, q):
         c = state["cube"]
         if c is None:
             return _empty_figure("No cube loaded — upload a file or paste a link above")
@@ -296,13 +316,14 @@ def build_app(cube=None):
         if e is None or e <= (s or 0):  # stale/empty interval -> full channels
             s, e = 0, c.shape[2]
         # dash 4.5: single Output -> return the raw value (no [..] wrap)
-        return map_figure(c, s, e, zmin, zmax, cscale, bool(log), m, q)
+        return map_figure(c, s, e, zmin, zmax, cscale, bool(log), m, q, roi)
 
     @app.callback(Output("spectrum", "figure"),
                   Input("roi-store", "data"), Input("points-store", "data"),
+                  Input("ch-store", "data"),
                   Input("apply-calibration", "n_clicks"), Input("gen", "data"),
                   State("m", "value"), State("q", "value"))
-    def _spec_figure(roi, pts, _n_cal, _gen, m, q):
+    def _spec_figure(roi, pts, channels, _n_cal, _gen, m, q):
         c = state["cube"]
         if c is None:
             return _empty_figure("No cube loaded")
@@ -312,7 +333,7 @@ def build_app(cube=None):
             pts = keep or None
         if roi and roi[1] <= roi[0] and roi[3] <= roi[2]:  # degenerate ROI -> full frame
             roi = None
-        return spectrum_figure(c, roi=roi, points=pts, m=m, q=q)
+        return spectrum_figure(c, roi=roi, points=pts, m=m, q=q, channel_range=channels)
 
     @app.callback(Output("roi-store", "data"),
                   Input("map", "relayoutData"), Input("apply-roi", "n_clicks"),
