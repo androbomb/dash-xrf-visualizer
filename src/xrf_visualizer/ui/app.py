@@ -316,7 +316,7 @@ def build_app(cube=None):
                 dbc.Col(html.H4("XRF Map", style={"color": _ACCENT}),
                         width={"size": 6, "offset": 3}),
                 html.Div(dcc.Graph(id="map", responsive=True,
-                                   config={"doubleClick": "reset"},
+                                   config={"doubleClick": False},
                                    style={"height": "100%", "width": "100%"}),
                          id="map-frame", style={"width": "100%",
                                                  "aspectRatio": W / H if H else 1}),
@@ -363,8 +363,8 @@ def build_app(cube=None):
                 ]),
                 html.B("Calibration (keV = m × channel + q)"),
                 dbc.Row(className="g-2 align-items-end", children=[
-                    dbc.Col([dbc.Label("m", html_for="m"), dbc.Input(id="m", type="number", step="any")], width=6),
-                    dbc.Col([dbc.Label("q", html_for="q"), dbc.Input(id="q", type="number", step="any")], width=6),
+                    dbc.Col([dbc.Label("m", html_for="m"), dbc.Input(id="m", type="text", inputMode="decimal")], width=6),
+                    dbc.Col([dbc.Label("q", html_for="q"), dbc.Input(id="q", type="text", inputMode="decimal")], width=6),
                     dbc.Col(dbc.Button("Apply calibration", id="apply-calibration", n_clicks=0, outline=True, color="info"), width=12),
                     dbc.Col(html.Div(id="cal-msg", className="text-info small"), width=12),
                 ]),
@@ -415,21 +415,14 @@ def build_app(cube=None):
     app.clientside_callback(
         """function(figure) {
             const root = document.getElementById("map");
-            if (root) {
-                const bind = () => {
-                    const graph = root.querySelector(".js-plotly-plot");
-                    if (!graph || graph.__mapResetBound || typeof graph.on !== "function") return false;
-                    graph.__mapResetBound = true;
-                    graph.on("plotly_doubleclick", function() {
+            if (root && !root.__mapResetBound) {
+                root.__mapResetBound = true;
+                root.addEventListener("dblclick", function(event) {
+                    const plot = root.querySelector(".js-plotly-plot");
+                    if (plot && plot.contains(event.target)) {
                         window.dash_clientside.set_props("map-reset-store", {data: Date.now()});
-                    });
-                    return true;
-                };
-                const observer = new MutationObserver(function() {
-                    if (bind()) observer.disconnect();
-                });
-                observer.observe(root, {childList: true, subtree: true});
-                if (bind()) observer.disconnect();
+                    }
+                }, true);
             }
             return Date.now();
         }""",

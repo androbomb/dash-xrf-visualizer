@@ -164,7 +164,12 @@ been performed as part of creating these templates. Do not invent entries.
 - **Fix:** explicitly configure Plotly's map double-click action as `reset`; the ROI callback consumes autorange relayouts before any stale box-selection data.
 - **Verification:** UI HTTP regression test confirms an autorange event restores full map bounds even if the prior rectangle selection is still present.
 
-### 2026-11-13 — M20: notebook map reset and calibration precision (completed)
+### 2026-11-13 — M20: notebook map reset and calibration precision (superseded)
 
-- **Fix:** capture Plotly's `plotly_doubleclick` event and reset the ROI store directly, including inline notebook use; m/q numeric inputs use `step="any"` so values with more than three decimal places are valid. Calibration labels retain the submitted float precision.
-- **Verification:** UI tests cover reset-store precedence and m/q values with seven decimal places; `uv run pytest -q` → 61 passed, 1 skipped (GPU). Browser/Jupyter interaction was not exercised in this environment.
+- **First attempt:** captured Plotly's `plotly_doubleclick` event and set m/q numeric inputs to `step="any"`.
+- **Result:** user reported both issues persisted in the deployed UI; the HTTP tests had not exercised a real browser.
+
+### 2026-11-13 — M21: browser-independent map reset and decimal calibration input (implemented)
+
+- **Fix:** bind a native DOM double-click listener to the stable Dash map root and route it through the ROI reset store; disable Plotly's competing double-click action. Use decimal text inputs for m/q to avoid browser numeric-step validation while retaining server-side finite-value checks and float precision.
+- **Verification:** UI test confirms the clientside listener is registered and m=0.0751 reaches the calibration store; `uv run pytest -q` → 61 passed, 1 skipped (GPU). Browser/Jupyter runtime remains unverified because no browser is installed here.

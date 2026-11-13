@@ -92,7 +92,7 @@ notebook still scrolls inside the embedded app.
 - `.npy`: single 3-D array, channel (ADC) axis only.
 - Uncalibrated files display the channel axis; the UI provides manual
   calibration `E(i) = m·i + q` (m in keV/channel, q in keV); m and q accept
-  arbitrary decimal precision (`step="any"`).
+  arbitrary decimal precision using decimal text inputs.
 - Examples (real data, git-ignored): `data_example/`.
 
 ## Compute

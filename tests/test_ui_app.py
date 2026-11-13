@@ -80,6 +80,9 @@ def test_build_app(cube):
     for expected in ("map", "spectrum", "roi-store", "ch-store", "points-store",
                      "apply-roi", "apply-points", "apply-ch", "clear", "m", "q"):
         assert expected in ids
+    clientside = "\n".join(app._inline_scripts)
+    assert 'addEventListener("dblclick"' in clientside
+    assert 'set_props("map-reset-store"' in clientside
 
 
 def test_legacy_boolean_jupyter_mode_uses_inline(monkeypatch):
@@ -359,17 +362,17 @@ def test_xrf_line_select_applies_calibrated_energy_width(cube):
 
 def test_calibration_inputs_accept_full_float_precision(cube):
     app = build_app(cube)
-    assert _component(app.layout, "m").step == "any"
-    assert _component(app.layout, "q").step == "any"
+    assert _component(app.layout, "m").type == "text"
+    assert _component(app.layout, "q").type == "text"
     cal_key = next(k for k, spec in app.callback_map.items() if "cal-store.data" in k)
     calibration, message, _ = _http_callback(app, cal_key,
         {"apply-calibration.n_clicks": 1},
-        {"m.value": 0.00234567, "q.value": 0.00345678},
+        {"m.value": "0.0751", "q.value": "0.00345678"},
         "apply-calibration.n_clicks")
-    assert calibration == {"m": 0.00234567, "q": 0.00345678}
-    assert message == "Applied: E = 0.00234567 × channel + 0.00345678 keV"
+    assert calibration == {"m": 0.0751, "q": 0.00345678}
+    assert message == "Applied: E = 0.0751 × channel + 0.00345678 keV"
     fig = spectrum_figure(cube, m=calibration["m"], q=calibration["q"])
-    assert fig.layout.xaxis.title.text == "E (keV; m=0.00234567, q=0.00345678)"
+    assert fig.layout.xaxis.title.text == "E (keV; m=0.0751, q=0.00345678)"
 
 
 def test_download_current_map_is_cropped_pixel_exact_png(cube):
