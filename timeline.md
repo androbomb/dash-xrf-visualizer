@@ -129,3 +129,9 @@ been performed as part of creating these templates. Do not invent entries.
 - **Fixes:** m/q now trigger both figure callbacks directly, while Apply calibration confirms the active formula. Numeric ROI explicitly disables `imshow`'s reversed autorange, so its x and y ranges both match the requested box. Added a compact Reset scale button that clears zmin/zmax.
 - **Real-data check:** `Ragazzo-triste` cube with `m=0.0023`, `q=0.0036` produced spectrum x-axis `0.003600–1.151300 keV` for channels 0–500; the plot title reports the coefficients. Calibration only rescales plotted X coordinates.
 - **Verification:** `uv run pytest -q tests/test_ui_app.py` → 18 passed; full `uv run pytest -q` → 55 passed, 1 skipped (GPU). HTTP tests cover both-trigger ROI precedence and the unequal-axis ROI zoom (`x=60..80`, `y=70..90`), calibration, and Reset scale.
+
+### 2026-11-13 — M14: explicit apply state and XRF-line integration (completed)
+
+- **Root cause:** scale fields were callback `State`, so clearing them did not refresh the figure; calibration controls fed values into figure callbacks but “Apply calibration” did not commit a distinct applied calibration state.
+- **Fix:** Apply scale commits zmin/zmax to a store; Reset scale clears that store and the visible inputs. Apply calibration validates and commits m/q to a store consumed by both plots. Added a searchable dropdown populated from `XRFlines.json`, a width input in keV, and Apply; it converts the requested energy window around the selected line to half-open ADC channel bounds and updates the map interval.
+- **Verification:** `uv run pytest -q` → 56 passed, 1 skipped (GPU); UI tests cover applied/reset scale, calibration store and figure axes, and line-centered channel integration. `git diff --check` is clean.

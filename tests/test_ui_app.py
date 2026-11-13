@@ -250,37 +250,52 @@ def test_apply_roi_zoom_on_unequal_image_axes():
 
 def test_http_map_controls_and_calibration(cube):
     app = build_app(cube)
+    scale_key = next(k for k, spec in app.callback_map.items() if "scale-store.data" in k)
+    scale, zmin, zmax = _http_callback(app, scale_key,
+        {"apply-scale.n_clicks": 1, "reset-scale.n_clicks": 0},
+        {"zmin.value": 0, "zmax.value": 10}, "apply-scale.n_clicks")
+    assert scale == {"zmin": 0, "zmax": 10} and (zmin, zmax) == (0, 10)
     base = {"ch-store.data": [0, C], "roi-store.data": [0, H, 0, W],
-            "zmin.value": None, "zmax.value": None,
-            "colorscale.value": "Viridis", "log.value": [],
-            "apply-scale.n_clicks": 0,
-            "apply-calibration.n_clicks": 0, "gen.data": 0}
-    states = {"zmin.value": 0, "zmax.value": 10}
-    fig = _http_callback(app, "map.figure", {**base, "apply-scale.n_clicks": 1},
-                         states, "apply-scale.n_clicks")
+            "points-store.data": [], "colorscale.value": "Viridis", "log.value": [],
+            "scale-store.data": scale, "cal-store.data": None, "gen.data": 0}
+    fig = _http_callback(app, "map.figure", base, {}, "scale-store.data")
     assert fig["layout"]["coloraxis"]["cmin"] == 0
     assert fig["layout"]["coloraxis"]["cmax"] == 10
-    calibrated = _http_callback(app, "map.figure",
-        {**base, "apply-calibration.n_clicks": 1, "m.value": 0.5, "q.value": 1}, states,
+
+    reset, zmin, zmax = _http_callback(app, scale_key,
+        {"apply-scale.n_clicks": 1, "reset-scale.n_clicks": 1},
+        {"zmin.value": 0, "zmax.value": 10}, "reset-scale.n_clicks")
+    assert reset == {"zmin": None, "zmax": None} and (zmin, zmax) == (None, None)
+    reset_fig = _http_callback(app, "map.figure", {**base, "scale-store.data": reset},
+                               {}, "scale-store.data")
+    assert "cmin" not in reset_fig["layout"]["coloraxis"]
+    assert "cmax" not in reset_fig["layout"]["coloraxis"]
+
+    cal_key = next(k for k, spec in app.callback_map.items() if "cal-store.data" in k)
+    calibration, message = _http_callback(app, cal_key,
+        {"apply-calibration.n_clicks": 1}, {"m.value": 0.5, "q.value": 1},
         "apply-calibration.n_clicks")
+    assert message == "Applied: E = 0.5 × channel + 1 keV"
+    calibrated = _http_callback(app, "map.figure", {**base, "cal-store.data": calibration},
+                                 {}, "cal-store.data")
     assert calibrated["layout"]["title"]["text"] == "Integrated over 1–257 keV"
     spectrum = _http_callback(app, "spectrum.figure",
         {"roi-store.data": [0, H, 0, W], "points-store.data": [], "ch-store.data": [0, C],
-         "log.value": ["log"], "apply-calibration.n_clicks": 1, "gen.data": 0,
-         "m.value": 0.5, "q.value": 1}, {}, "apply-calibration.n_clicks")
+         "log.value": ["log"], "cal-store.data": calibration, "gen.data": 0},
+        {}, "cal-store.data")
     assert spectrum["layout"]["xaxis"]["title"]["text"] == "E (keV; m=0.5, q=1)"
     assert spectrum["layout"]["xaxis"]["range"] == [0.75, 256.75]
     assert spectrum["layout"]["yaxis"]["title"]["text"] == "log1p(sum counts)"
-    message = _http_callback(app, "cal-msg.children",
-        {"apply-calibration.n_clicks": 1, "m.value": 0.5, "q.value": 1}, {},
-        "apply-calibration.n_clicks")
-    assert message == "Applied: E = 0.5 × channel + 1 keV"
 
-    reset_key = next(k for k, spec in app.callback_map.items()
-                     if isinstance(spec["output"], (list, tuple))
-                     and {o.component_id for o in spec["output"]} == {"zmin", "zmax"})
-    assert _http_callback(app, reset_key, {"reset-scale.n_clicks": 1}, {},
-                          "reset-scale.n_clicks") == (None, None)
+
+def test_xrf_line_select_applies_calibrated_energy_width(cube):
+    app = build_app(cube)
+    line_key = next(k for k, spec in app.callback_map.items() if "line-msg.children" in k)
+    out = _http_callback(app, line_key, {"apply-line.n_clicks": 1},
+        {"line-select.value": 1.486, "line-width.value": 0.2,
+         "cal-store.data": {"m": 0.01, "q": 0}, "ch-store.data": [0, C]},
+        "apply-line.n_clicks")
+    assert out == ([139, 159], "Integrating 1.486 ± 0.1 keV")
 
 
 def test_clear_selection_resets_both_plots(cube):
@@ -354,13 +369,14 @@ def test_build_app_empty():
                      "apply-roi", "apply-points", "apply-ch", "clear", "m", "q",
                      "upload", "url", "load-url", "change-file", "load-msg",
                      "apply-calibration", "apply-scale",
-                     "reset-scale", "cal-msg", "cube-name", "gen"):
+                     "reset-scale", "cal-msg", "line-select", "line-width",
+                     "apply-line", "scale-store", "cal-store", "cube-name", "gen"):
         assert expected in ids
     # figures render the empty state without a cube (raw figure, dash 4.5 single-Output)
-    f = _cb(app, "map.figure")([0, 0], [0, 0, 0, 0], [], "Viridis", [], 0, 0, 0,
-                                None, None, None, None)
+    f = _cb(app, "map.figure")([0, 0], [0, 0, 0, 0], [], "Viridis", [],
+                                {"zmin": None, "zmax": None}, None, 0)
     assert not f.data
-    f = _cb(app, "spectrum.figure")([0, 0, 0, 0], [], [0, 0], [], 0, 0, None, None)
+    f = _cb(app, "spectrum.figure")([0, 0, 0, 0], [], [0, 0], [], None, 0)
     assert not f.data
 
 
@@ -371,8 +387,8 @@ def test_on_load_upload(empty_app, cube):
     assert "Loaded synthetic_cube.npz" in out[0]
     assert out[4] == 1  # gen bumped
     # map figure now matches the processing layer for the full channel range
-    m = _cb(empty_app, "map.figure")([0, C], [0, H, 0, W], [], "Viridis", [], 0, 0, 1,
-                                      None, None, None, None)
+    m = _cb(empty_app, "map.figure")([0, C], [0, H, 0, W], [], "Viridis", [],
+                                      {"zmin": None, "zmax": None}, None, 1)
     z = np.asarray(m.data[0]["z"])
     from xrf_visualizer.processing import map_from_channels
     np.testing.assert_array_equal(z, map_from_channels(cube, 0, C))
@@ -386,8 +402,8 @@ def test_on_load_upload_bad_bytes(empty_app, cube):
     assert out[0].startswith("Upload failed")
     assert out[4] is no_update
     # state untouched: figures still empty
-    m = _cb(empty_app, "map.figure")([0, C], [0, H, 0, W], [], "Viridis", [], 0, 0, 0,
-                                      None, None, None, None)
+    m = _cb(empty_app, "map.figure")([0, C], [0, H, 0, W], [], "Viridis", [],
+                                      {"zmin": None, "zmax": None}, None, 0)
     assert not m.data
 
 

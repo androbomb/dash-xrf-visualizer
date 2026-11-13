@@ -25,6 +25,7 @@ dash-bootstrap-components DARKLY theme, #4196B4 navbar, fluid container,
 5/7 columns, outline info buttons.
 """
 import base64
+import math
 import re
 from pathlib import Path
 
@@ -34,7 +35,7 @@ import plotly.express as px
 import plotly.graph_objects as go
 from dash import Dash, Input, Output, State, ctx, dcc, html, no_update
 
-from ..data import download_cube, load_cube_bytes
+from ..data import download_cube, load_cube_bytes, load_xrf_lines
 from ..processing import (
     calibrate,
     map_from_channels,
@@ -44,6 +45,7 @@ from ..processing import (
 
 _COLORSCALES = ("Viridis", "Plasma", "Hot", "Greys", "Jet")
 _ACCENT = "#4196B4"  # legacy infn_lightblue
+_XRF_LINES = load_xrf_lines()
 
 
 class _XrfDash(Dash):
@@ -312,23 +314,33 @@ def build_app(cube=None):
                     dbc.Col(dbc.Button("Apply calibration", id="apply-calibration", n_clicks=0, outline=True, color="info"), width=12),
                     dbc.Col(html.Div(id="cal-msg", className="text-info small"), width=12),
                 ]),
+                dbc.Row(className="g-2 align-items-end mt-1", children=[
+                    dbc.Col([dbc.Label("Select Line"), dcc.Dropdown(
+                        id="line-select", options=[
+                            {"label": f"{line['element']} ({line['value']:g} keV)", "value": line["value"]}
+                            for line in _XRF_LINES], placeholder="Search XRF line…", searchable=True)], width=5),
+                    dbc.Col([dbc.Label("Select width (keV)"), dbc.Input(
+                        id="line-width", type="number", min=0, step="any", value=0.1)], width=4),
+                    dbc.Col(dbc.Button("Apply", id="apply-line", n_clicks=0,
+                                       outline=True, color="info"), width=3),
+                    dbc.Col(html.Div(id="line-msg", className="text-info small"), width=12),
+                ]),
             ]),
         ]),
         html.Div(id="msg", style={"color": "orange"}),
         dcc.Store(id="roi-store", data=[0, H, 0, W]),
         dcc.Store(id="ch-store", data=[0, C]),
         dcc.Store(id="points-store", data=[]),
+        dcc.Store(id="scale-store", data={"zmin": None, "zmax": None}),
+        dcc.Store(id="cal-store", data=None),
         dcc.Store(id="gen", data=0),
     ])
 
     @app.callback(Output("map", "figure"),
                   Input("ch-store", "data"), Input("roi-store", "data"),
                   Input("points-store", "data"), Input("colorscale", "value"), Input("log", "value"),
-                  Input("apply-scale", "n_clicks"),
-                  Input("apply-calibration", "n_clicks"), Input("gen", "data"),
-                  Input("m", "value"), Input("q", "value"),
-                  State("zmin", "value"), State("zmax", "value"))
-    def _map_figure(ch, roi, points, cscale, log, _n_scale, _n_cal, _gen, m, q, zmin, zmax):
+                  Input("scale-store", "data"), Input("cal-store", "data"), Input("gen", "data"))
+    def _map_figure(ch, roi, points, cscale, log, scale, calibration, _gen):
         c = state["cube"]
         if c is None:
             return _empty_figure("No cube loaded — upload a file or paste a link above")
@@ -336,14 +348,16 @@ def build_app(cube=None):
         if e is None or e <= (s or 0):  # stale/empty interval -> full channels
             s, e = 0, c.shape[2]
         # dash 4.5: single Output -> return the raw value (no [..] wrap)
-        return map_figure(c, s, e, zmin, zmax, cscale, bool(log), m, q, roi, points)
+        scale = scale or {}
+        m, q = (calibration or {}).get("m"), (calibration or {}).get("q")
+        return map_figure(c, s, e, scale.get("zmin"), scale.get("zmax"),
+                          cscale, bool(log), m, q, roi, points)
 
     @app.callback(Output("spectrum", "figure"),
                   Input("roi-store", "data"), Input("points-store", "data"),
                   Input("ch-store", "data"), Input("log", "value"),
-                  Input("apply-calibration", "n_clicks"), Input("gen", "data"),
-                  Input("m", "value"), Input("q", "value"))
-    def _spec_figure(roi, pts, channels, log, _n_cal, _gen, m, q):
+                  Input("cal-store", "data"), Input("gen", "data"))
+    def _spec_figure(roi, pts, channels, log, calibration, _gen):
         c = state["cube"]
         if c is None:
             return _empty_figure("No cube loaded")
@@ -353,7 +367,8 @@ def build_app(cube=None):
             pts = keep or None
         if roi and roi[1] <= roi[0] and roi[3] <= roi[2]:  # degenerate ROI -> full frame
             roi = None
-        return spectrum_figure(c, roi=roi, points=pts, m=m, q=q,
+        return spectrum_figure(c, roi=roi, points=pts,
+                               m=(calibration or {}).get("m"), q=(calibration or {}).get("q"),
                                channel_range=channels, log=bool(log))
 
     @app.callback(Output("roi-store", "data"),
@@ -395,6 +410,34 @@ def build_app(cube=None):
                 return r
         return cur
 
+    @app.callback([Output("ch-store", "data", allow_duplicate=True),
+                   Output("line-msg", "children")],
+                  Input("apply-line", "n_clicks"),
+                  State("line-select", "value"), State("line-width", "value"),
+                  State("cal-store", "data"), State("ch-store", "data"),
+                  prevent_initial_call=True)
+    def _apply_line(_n, line_energy, width, calibration, cur):
+        if line_energy is None:
+            return no_update, "Select an XRF line"
+        if not calibration:
+            return no_update, "Apply calibration first"
+        if state["cube"] is None:
+            return no_update, "Load a cube first"
+        try:
+            m, q = calibration["m"], calibration["q"]
+            width = float(width)
+            if not math.isfinite(width) or width <= 0:
+                raise ValueError("Width must be a positive number of keV")
+            start = math.ceil((float(line_energy) - width / 2 - q) / m)
+            end = math.floor((float(line_energy) + width / 2 - q) / m) + 1
+            channels = state["cube"].shape[2]
+            start, end = max(0, start), min(channels, end)
+            if start >= end:
+                raise ValueError("Selected line and width do not overlap cube channels")
+            return [start, end], f"Integrating {line_energy:g} ± {width / 2:g} keV"
+        except (KeyError, TypeError, ValueError, ZeroDivisionError) as e:
+            return no_update, str(e)
+
     @app.callback([Output("points-store", "data"), Output("msg", "children"),
                    Output("roi-store", "data"), Output("ch-store", "data")],
                   Input("apply-points", "n_clicks"), Input("clear", "n_clicks"),
@@ -417,20 +460,30 @@ def build_app(cube=None):
         except ValueError as e:
             return no_update, str(e), no_update, no_update
 
-    @app.callback(Output("cal-msg", "children"),
-                  Input("apply-calibration", "n_clicks"), Input("m", "value"), Input("q", "value"),
+    @app.callback([Output("cal-store", "data"), Output("cal-msg", "children")],
+                  Input("apply-calibration", "n_clicks"),
+                  State("m", "value"), State("q", "value"),
                   prevent_initial_call=True)
     def _calibration_msg(_n, m, q):
         if m is None:
-            return "Enter m (keV/channel) to apply calibration"
-        status = "Applied" if ctx.triggered_id == "apply-calibration" else "Ready"
-        return f"{status}: E = {m:g} × channel + {q or 0:g} keV"
+            return no_update, "Enter m (keV/channel) to apply calibration"
+        try:
+            m, q = float(m), float(q or 0)
+            if not math.isfinite(m) or m <= 0 or not math.isfinite(q):
+                raise ValueError
+        except (TypeError, ValueError):
+            return no_update, "Enter finite m > 0 and q values"
+        return {"m": m, "q": q}, f"Applied: E = {m:g} × channel + {q:g} keV"
 
-    @app.callback([Output("zmin", "value", allow_duplicate=True),
-                   Output("zmax", "value", allow_duplicate=True)],
-                  Input("reset-scale", "n_clicks"), prevent_initial_call=True)
-    def _reset_scale(_n):
-        return None, None
+    @app.callback([Output("scale-store", "data"), Output("zmin", "value"),
+                   Output("zmax", "value")],
+                  Input("apply-scale", "n_clicks"), Input("reset-scale", "n_clicks"),
+                  State("zmin", "value"), State("zmax", "value"),
+                  prevent_initial_call=True)
+    def _set_scale(_apply, _reset, zmin, zmax):
+        if ctx.triggered_id == "reset-scale":
+            return {"zmin": None, "zmax": None}, None, None
+        return {"zmin": zmin, "zmax": zmax}, zmin, zmax
 
     # --- M6: file loading (upload / link / change) ---------------------------
     @app.callback([Output("load-msg", "children"), Output("cube-name", "children"),

@@ -48,12 +48,15 @@ parts were removed by decision; the custom CHNet raw reader is deferred.
 - M13 (calibration refresh, ROI zoom, scale reset) completed 2026-11-13:
   changing m/q refreshes both plots; Apply ROI disables `imshow` autorange so
   both numeric axes zoom to the requested box; Reset scale clears zmin/zmax.
+- M14 (explicit calibration, scale reset, line integration) completed 2026-11-13:
+  Apply buttons commit settings to figure state; searchable JSON XRF lines can
+  be integrated over a user-set width centered on the selected line energy.
 
 ## Setup (verified 2026-11-10)
 
 ```bash
 uv sync
-  .venv/bin/python -m pytest -q          # 55 passed + 1 GPU skip, CPU only
+  .venv/bin/python -m pytest -q          # 56 passed + 1 GPU skip, CPU only
 .venv/bin/python -m ipykernel install --user --name xrf-viz \
     --display-name "Python 3.12 (xrf-viz)"
 ```
@@ -110,6 +113,10 @@ host, 2026-11-10). GPU is an opt-in, NOT TESTED variant —
 - M13: m/q are live figure inputs (the button confirms calibration); Reset scale
   clears both limits. Numeric ROI disables Plotly's reversed autorange and
   explicitly zooms both axes to x0..x1 and y0..y1.
+- M14: Apply calibration commits m/q to both plots; Apply scale commits zmin/zmax,
+  while Reset scale clears the committed limits and their input fields. The
+  searchable Select Line menu reads `XRFlines.json`; Apply integrates the
+  selected keV width centered on that line (requires an applied calibration).
 - `example.ipynb`: set `path_to_file`, then `build_app(cube)` and
   `app.run(jupyter_mode="inline")` (Dash 4.x); `app.run()` also works from a terminal.
 
