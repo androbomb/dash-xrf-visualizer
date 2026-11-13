@@ -163,3 +163,8 @@ been performed as part of creating these templates. Do not invent entries.
 
 - **Fix:** explicitly configure Plotly's map double-click action as `reset`; the ROI callback consumes autorange relayouts before any stale box-selection data.
 - **Verification:** UI HTTP regression test confirms an autorange event restores full map bounds even if the prior rectangle selection is still present.
+
+### 2026-11-13 — M20: notebook map reset and calibration precision (completed)
+
+- **Fix:** capture Plotly's `plotly_doubleclick` event and reset the ROI store directly, including inline notebook use; m/q numeric inputs use `step="any"` so values with more than three decimal places are valid. Calibration labels retain the submitted float precision.
+- **Verification:** UI tests cover reset-store precedence and m/q values with seven decimal places; `uv run pytest -q` → 61 passed, 1 skipped (GPU). Browser/Jupyter interaction was not exercised in this environment.

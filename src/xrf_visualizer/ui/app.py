@@ -180,7 +180,7 @@ def map_figure(cube, ch_start, ch_end, zmin=None, zmax=None,
     if zmin is not None or zmax is not None:
         fig.update_coloraxes(cmin=float(zmin) if zmin is not None else None,
                              cmax=float(zmax) if zmax is not None else None)
-    interval = (f"{m * ch_start + (q or 0):g}–{m * ch_end + (q or 0):g} keV"
+    interval = (f"{m * ch_start + (q or 0):.12g}–{m * ch_end + (q or 0):.12g} keV"
                 if m is not None else f"{ch_start}–{ch_end} ADC channels")
     fig.update_layout(title=f"Integrated over {interval}",
                       margin=dict(l=40, r=10, t=55, b=30))
@@ -215,7 +215,7 @@ def spectrum_figure(cube, roi=None, points=None, m=None, q=None, channel_range=N
         spec = np.log1p(spec)
     if m is not None:
         e = calibrate(C, m, q or 0.0)
-        x, xlab = e, f"E (keV; m={m:g}, q={q or 0:g})"
+        x, xlab = e, f"E (keV; m={m}, q={q or 0})"
     else:
         x, xlab = np.arange(C), "channel (ADC)"
     # go.Scatter (not px.line): px.line wants a pandas frame for plain arrays
@@ -363,8 +363,8 @@ def build_app(cube=None):
                 ]),
                 html.B("Calibration (keV = m × channel + q)"),
                 dbc.Row(className="g-2 align-items-end", children=[
-                    dbc.Col([dbc.Label("m", html_for="m"), dbc.Input(id="m", type="number", step=0.001)], width=6),
-                    dbc.Col([dbc.Label("q", html_for="q"), dbc.Input(id="q", type="number", step=0.001)], width=6),
+                    dbc.Col([dbc.Label("m", html_for="m"), dbc.Input(id="m", type="number", step="any")], width=6),
+                    dbc.Col([dbc.Label("q", html_for="q"), dbc.Input(id="q", type="number", step="any")], width=6),
                     dbc.Col(dbc.Button("Apply calibration", id="apply-calibration", n_clicks=0, outline=True, color="info"), width=12),
                     dbc.Col(html.Div(id="cal-msg", className="text-info small"), width=12),
                 ]),
@@ -391,6 +391,8 @@ def build_app(cube=None):
         dcc.Store(id="cal-store", data=None),
         dcc.Store(id="gen", data=0),
         dcc.Download(id="map-download"),
+        dcc.Store(id="map-reset-store", data=0),
+        dcc.Store(id="map-bind-store", data=0),
     ])
 
     @app.callback(Output("map", "figure"),
@@ -409,6 +411,30 @@ def build_app(cube=None):
         m, q = (calibration or {}).get("m"), (calibration or {}).get("q")
         return map_figure(c, s, e, scale.get("zmin"), scale.get("zmax"),
                           cscale, bool(log), m, q, roi, points)
+
+    app.clientside_callback(
+        """function(figure) {
+            const root = document.getElementById("map");
+            if (root) {
+                const bind = () => {
+                    const graph = root.querySelector(".js-plotly-plot");
+                    if (!graph || graph.__mapResetBound || typeof graph.on !== "function") return false;
+                    graph.__mapResetBound = true;
+                    graph.on("plotly_doubleclick", function() {
+                        window.dash_clientside.set_props("map-reset-store", {data: Date.now()});
+                    });
+                    return true;
+                };
+                const observer = new MutationObserver(function() {
+                    if (bind()) observer.disconnect();
+                });
+                observer.observe(root, {childList: true, subtree: true});
+                if (bind()) observer.disconnect();
+            }
+            return Date.now();
+        }""",
+        Output("map-bind-store", "data"), Input("map", "figure"),
+    )
 
     @app.callback(Output("map-frame", "style"), Input("roi-store", "data"))
     def _map_frame_style(roi):
@@ -463,16 +489,18 @@ def build_app(cube=None):
 
     @app.callback(Output("roi-store", "data"),
                   Input("map", "relayoutData"), Input("map", "selectedData"),
-                  Input("apply-roi", "n_clicks"),
+                  Input("map-reset-store", "data"), Input("apply-roi", "n_clicks"),
                   State("roi-store", "data"),
                   State("roi-y0", "value"), State("roi-y1", "value"),
                   State("roi-x0", "value"), State("roi-x1", "value"),
                   prevent_initial_call=True)
-    def _set_roi(rl, selected, n, cur, y0, y1, x0, x1):
+    def _set_roi(rl, selected, _map_reset, n, cur, y0, y1, x0, x1):
         c = state["cube"]
         if c is None:
             return cur
         H, W, _ = c.shape
+        if "map-reset-store.data" in ctx.triggered_prop_ids:
+            return [0, H, 0, W]
         if "apply-roi.n_clicks" in ctx.triggered_prop_ids:
             return _clamp_roi(H, W, y0, y1, x0, x1)
         if ctx.triggered_id == "map":
@@ -572,7 +600,7 @@ def build_app(cube=None):
                 raise ValueError
         except (TypeError, ValueError):
             return no_update, "Enter finite m > 0 and q values", no_update
-        return {"m": m, "q": q}, f"Applied: E = {m:g} × channel + {q:g} keV", False
+        return {"m": m, "q": q}, f"Applied: E = {m} × channel + {q} keV", False
 
     @app.callback(Output("line-selected", "children"), Input("line-select", "value"))
     def _show_selected_line(value):

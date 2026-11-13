@@ -61,6 +61,19 @@ def _ids(node, out):
     return out
 
 
+def _component(node, component_id):
+    if getattr(node, "id", None) == component_id:
+        return node
+    children = getattr(node, "children", None)
+    if not isinstance(children, (list, tuple)):
+        children = [children]
+    for child in children:
+        found = _component(child, component_id) if child is not None else None
+        if found is not None:
+            return found
+    return None
+
+
 def test_build_app(cube):
     app = build_app(cube)
     ids = _ids(app.layout, [])
@@ -129,6 +142,7 @@ def test_rectangular_graph_selection_updates_roi_and_aspect(cube):
     roi = _http_callback(app, "roi-store.data",
         {"map.relayoutData": None,
          "map.selectedData": {"range": {"x": [10.2, 20.8], "y": [4.1, 9.7]}},
+         "map-reset-store.data": 0,
          "apply-roi.n_clicks": 0},
         {"roi-store.data": [0, H, 0, W], "roi-y0.value": 0, "roi-y1.value": H,
          "roi-x0.value": 0, "roi-x1.value": W}, "map.selectedData")
@@ -142,6 +156,13 @@ def test_rectangular_graph_selection_updates_roi_and_aspect(cube):
          "apply-roi.n_clicks": 0},
         {"roi-store.data": roi, "roi-y0.value": 4, "roi-y1.value": 10,
          "roi-x0.value": 10, "roi-x1.value": 21}, "map.relayoutData")
+    assert reset == [0, H, 0, W]
+
+    reset = _http_callback(app, "roi-store.data",
+        {"map.relayoutData": None, "map.selectedData": None,
+         "map-reset-store.data": 1, "apply-roi.n_clicks": 0},
+        {"roi-store.data": roi, "roi-y0.value": 4, "roi-y1.value": 10,
+         "roi-x0.value": 10, "roi-x1.value": 21}, "map-reset-store.data")
     assert reset == [0, H, 0, W]
 
 
@@ -308,7 +329,7 @@ def test_http_map_controls_and_calibration(cube):
     calibration, message, apply_line_disabled = _http_callback(app, cal_key,
         {"apply-calibration.n_clicks": 1}, {"m.value": 0.5, "q.value": 1},
         "apply-calibration.n_clicks")
-    assert message == "Applied: E = 0.5 × channel + 1 keV"
+    assert message == "Applied: E = 0.5 × channel + 1.0 keV"
     assert apply_line_disabled is False
     calibrated = _http_callback(app, "map.figure", {**base, "cal-store.data": calibration},
                                  {}, "cal-store.data")
@@ -317,7 +338,7 @@ def test_http_map_controls_and_calibration(cube):
         {"roi-store.data": [0, H, 0, W], "points-store.data": [], "ch-store.data": [0, C],
          "log.value": ["log"], "cal-store.data": calibration, "gen.data": 0},
         {}, "cal-store.data")
-    assert spectrum["layout"]["xaxis"]["title"]["text"] == "E (keV; m=0.5, q=1)"
+    assert spectrum["layout"]["xaxis"]["title"]["text"] == "E (keV; m=0.5, q=1.0)"
     assert spectrum["layout"]["xaxis"]["range"] == [0.75, 256.75]
     assert spectrum["layout"]["yaxis"]["title"]["text"] == "log1p(sum counts)"
 
@@ -334,6 +355,21 @@ def test_xrf_line_select_applies_calibrated_energy_width(cube):
                         if "line-selected.children" in k)
     assert _http_callback(app, selected_key, {"line-select.value": 1.486}, {},
                           "line-select.value") == "Selected: Al (Ka) — 1.486 keV"
+
+
+def test_calibration_inputs_accept_full_float_precision(cube):
+    app = build_app(cube)
+    assert _component(app.layout, "m").step == "any"
+    assert _component(app.layout, "q").step == "any"
+    cal_key = next(k for k, spec in app.callback_map.items() if "cal-store.data" in k)
+    calibration, message, _ = _http_callback(app, cal_key,
+        {"apply-calibration.n_clicks": 1},
+        {"m.value": 0.00234567, "q.value": 0.00345678},
+        "apply-calibration.n_clicks")
+    assert calibration == {"m": 0.00234567, "q": 0.00345678}
+    assert message == "Applied: E = 0.00234567 × channel + 0.00345678 keV"
+    fig = spectrum_figure(cube, m=calibration["m"], q=calibration["q"])
+    assert fig.layout.xaxis.title.text == "E (keV; m=0.00234567, q=0.00345678)"
 
 
 def test_download_current_map_is_cropped_pixel_exact_png(cube):
@@ -450,7 +486,8 @@ def test_build_app_empty():
                      "apply-calibration", "apply-scale",
                      "reset-scale", "cal-msg", "line-select", "line-width",
                      "apply-line", "line-selected", "scale-store", "cal-store",
-                     "download-map", "map-frame", "cube-name", "gen"):
+                     "download-map", "map-frame", "map-reset-store", "map-bind-store",
+                     "cube-name", "gen"):
         assert expected in ids
     # figures render the empty state without a cube (raw figure, dash 4.5 single-Output)
     f = _cb(app, "map.figure")([0, 0], [0, 0, 0, 0], [], "Viridis", [],

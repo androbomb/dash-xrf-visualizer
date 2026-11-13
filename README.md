@@ -91,7 +91,8 @@ notebook still scrolls inside the embedded app.
   `.npz` may carry an optional `energy` vector (float64, keV).
 - `.npy`: single 3-D array, channel (ADC) axis only.
 - Uncalibrated files display the channel axis; the UI provides manual
-  calibration `E(i) = m·i + q` (m in keV/channel, q in keV).
+  calibration `E(i) = m·i + q` (m in keV/channel, q in keV); m and q accept
+  arbitrary decimal precision (`step="any"`).
 - Examples (real data, git-ignored): `data_example/`.
 
 ## Compute
@@ -145,6 +146,8 @@ host, 2026-11-10). GPU is an opt-in, NOT TESTED variant —
   crop as a lossless PNG with one square image pixel per matrix element. The
   chosen colorscale, zmin/zmax and log transform are applied; axes/colorbar and
   point markers are not included.
+- M20: map double-click resets the ROI in notebook and browser; calibration
+  inputs accept arbitrary decimal precision.
 - `example.ipynb`: set `path_to_file`, then `build_app(cube)` and
   `app.run(jupyter_mode="inline", jupyter_height=1000)` (Dash 4.x); the height
   is in pixels. `app.run()` also works from a terminal.
