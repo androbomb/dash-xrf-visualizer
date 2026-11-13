@@ -45,12 +45,15 @@ parts were removed by decision; the custom CHNet raw reader is deferred.
 - M12 (scale, clear, calibration) completed 2026-11-12: zmin/zmax apply to
   Plotly's shared color axis; Clear selection resets points, ROI and channels;
   calibration confirms and displays the active m/q values.
+- M13 (calibration refresh, ROI zoom, scale reset) completed 2026-11-13:
+  changing m/q refreshes both plots; Apply ROI disables `imshow` autorange so
+  both numeric axes zoom to the requested box; Reset scale clears zmin/zmax.
 
 ## Setup (verified 2026-11-10)
 
 ```bash
 uv sync
-.venv/bin/python -m pytest -q          # 53 passed + 1 GPU skip, CPU only
+  .venv/bin/python -m pytest -q          # 55 passed + 1 GPU skip, CPU only
 .venv/bin/python -m ipykernel install --user --name xrf-viz \
     --display-name "Python 3.12 (xrf-viz)"
 ```
@@ -104,6 +107,9 @@ host, 2026-11-10). GPU is an opt-in, NOT TESTED variant —
   are overlaid on the map, and the log checkbox transforms both plotted sums.
 - M12: Apply scale commits `coloraxis.cmin/cmax`; Clear selection restores both
   plots to full bounds; calibration shows the active formula on the spectrum.
+- M13: m/q are live figure inputs (the button confirms calibration); Reset scale
+  clears both limits. Numeric ROI disables Plotly's reversed autorange and
+  explicitly zooms both axes to x0..x1 and y0..y1.
 - `example.ipynb`: set `path_to_file`, then `build_app(cube)` and
   `app.run(jupyter_mode="inline")` (Dash 4.x); `app.run()` also works from a terminal.
 

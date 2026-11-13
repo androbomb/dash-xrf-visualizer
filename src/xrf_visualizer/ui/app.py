@@ -136,7 +136,9 @@ def map_figure(cube, ch_start, ch_end, zmin=None, zmax=None,
                       margin=dict(l=40, r=10, t=55, b=30))
     if roi:
         y0, y1, x0, x1 = roi
-        fig.update_layout(xaxis_range=[x0 - 0.5, x1 - 0.5],
+        # Disable imshow's reversed autorange so the explicit row bounds win.
+        fig.update_layout(xaxis_autorange=False, yaxis_autorange=False,
+                          xaxis_range=[x0 - 0.5, x1 - 0.5],
                           yaxis_range=[y1 - 0.5, y0 - 0.5])
     if points:
         fig.add_scatter(x=[p[1] for p in points], y=[p[0] for p in points],
@@ -269,10 +271,12 @@ def build_app(cube=None):
                     dbc.Col([dbc.Label("zmax", html_for="zmax"), dbc.Input(id="zmax", type="number")], width=2),
                     dbc.Col([dbc.Label("colormap", html_for="colorscale"), dcc.Dropdown(id="colorscale",
                                  options=[{"label": n, "value": n} for n in _COLORSCALES],
-                                 value="Viridis")], width=4),
-                    dbc.Col(dcc.Checklist(id="log", options=[{"label": "log", "value": "log"}], value=[]), width=2, className="pt-4"),
+                                 value="Viridis")], width=3),
+                    dbc.Col(dcc.Checklist(id="log", options=[{"label": "log", "value": "log"}], value=[]), width=1, className="pt-4"),
                     dbc.Col(dbc.Button("Apply scale", id="apply-scale", n_clicks=0,
-                                       outline=True, color="info"), width=2),
+                                       size="sm", outline=True, color="info"), width=2),
+                    dbc.Col(dbc.Button("Reset scale", id="reset-scale", n_clicks=0,
+                                       size="sm", outline=True, color="secondary"), width=2),
                 ]),
                 html.B("Interval → map"),
                 dbc.Row(className="g-2 align-items-end mb-2", children=[
@@ -322,8 +326,8 @@ def build_app(cube=None):
                   Input("points-store", "data"), Input("colorscale", "value"), Input("log", "value"),
                   Input("apply-scale", "n_clicks"),
                   Input("apply-calibration", "n_clicks"), Input("gen", "data"),
-                  State("m", "value"), State("q", "value"), State("zmin", "value"),
-                  State("zmax", "value"))
+                  Input("m", "value"), Input("q", "value"),
+                  State("zmin", "value"), State("zmax", "value"))
     def _map_figure(ch, roi, points, cscale, log, _n_scale, _n_cal, _gen, m, q, zmin, zmax):
         c = state["cube"]
         if c is None:
@@ -338,7 +342,7 @@ def build_app(cube=None):
                   Input("roi-store", "data"), Input("points-store", "data"),
                   Input("ch-store", "data"), Input("log", "value"),
                   Input("apply-calibration", "n_clicks"), Input("gen", "data"),
-                  State("m", "value"), State("q", "value"))
+                  Input("m", "value"), Input("q", "value"))
     def _spec_figure(roi, pts, channels, log, _n_cal, _gen, m, q):
         c = state["cube"]
         if c is None:
@@ -363,12 +367,12 @@ def build_app(cube=None):
         if c is None:
             return cur
         H, W, _ = c.shape
+        if "apply-roi.n_clicks" in ctx.triggered_prop_ids:
+            return _clamp_roi(H, W, y0, y1, x0, x1)
         if ctx.triggered_id == "map":
             r = _roi_from_relayout(rl, H, W)
             if r is not None:
                 return r
-        elif ctx.triggered_id == "apply-roi":
-            return _clamp_roi(H, W, y0, y1, x0, x1)
         return cur
 
     @app.callback(Output("ch-store", "data"),
@@ -381,14 +385,14 @@ def build_app(cube=None):
         if c is None:
             return cur
         C = c.shape[2]
+        if "apply-ch.n_clicks" in ctx.triggered_prop_ids:
+            s = max(0, min(int(s or 0), C))
+            e = max(0, min(int(e or C), C))
+            return [min(s, e), max(s, e)]
         if ctx.triggered_id == "spectrum":
             r = _ch_from_relayout(rl, C)
             if r is not None:
                 return r
-        elif ctx.triggered_id == "apply-ch":
-            s = max(0, min(int(s or 0), C))
-            e = max(0, min(int(e or C), C))
-            return [min(s, e), max(s, e)]
         return cur
 
     @app.callback([Output("points-store", "data"), Output("msg", "children"),
@@ -414,13 +418,19 @@ def build_app(cube=None):
             return no_update, str(e), no_update, no_update
 
     @app.callback(Output("cal-msg", "children"),
-                  Input("apply-calibration", "n_clicks"),
-                  State("m", "value"), State("q", "value"),
+                  Input("apply-calibration", "n_clicks"), Input("m", "value"), Input("q", "value"),
                   prevent_initial_call=True)
     def _calibration_msg(_n, m, q):
         if m is None:
             return "Enter m (keV/channel) to apply calibration"
-        return f"Applied: E = {m:g} × channel + {q or 0:g} keV"
+        status = "Applied" if ctx.triggered_id == "apply-calibration" else "Ready"
+        return f"{status}: E = {m:g} × channel + {q or 0:g} keV"
+
+    @app.callback([Output("zmin", "value", allow_duplicate=True),
+                   Output("zmax", "value", allow_duplicate=True)],
+                  Input("reset-scale", "n_clicks"), prevent_initial_call=True)
+    def _reset_scale(_n):
+        return None, None
 
     # --- M6: file loading (upload / link / change) ---------------------------
     @app.callback([Output("load-msg", "children"), Output("cube-name", "children"),

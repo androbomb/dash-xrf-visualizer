@@ -123,3 +123,9 @@ been performed as part of creating these templates. Do not invent entries.
 - **Clear selection:** resets point markers, ROI bounds and channel interval together, returning both plots to their full ranges.
 - **Calibration:** the spectrum axis title includes active m/q and a status line confirms the formula (or requests m if missing).
 - **Verification:** `uv run pytest -q` → 54 passed, 1 skipped (GPU); HTTP tests verify color-axis limits including zero, full-axis reset, and calibrated status/title/range.
+
+### 2026-11-13 — M13: calibration refresh, ROI zoom, reset scale (completed)
+
+- **Fixes:** m/q now trigger both figure callbacks directly, while Apply calibration confirms the active formula. Numeric ROI explicitly disables `imshow`'s reversed autorange, so its x and y ranges both match the requested box. Added a compact Reset scale button that clears zmin/zmax.
+- **Real-data check:** `Ragazzo-triste` cube with `m=0.0023`, `q=0.0036` produced spectrum x-axis `0.003600–1.151300 keV` for channels 0–500; the plot title reports the coefficients. Calibration only rescales plotted X coordinates.
+- **Verification:** `uv run pytest -q tests/test_ui_app.py` → 18 passed; full `uv run pytest -q` → 55 passed, 1 skipped (GPU). HTTP tests cover both-trigger ROI precedence and the unequal-axis ROI zoom (`x=60..80`, `y=70..90`), calibration, and Reset scale.

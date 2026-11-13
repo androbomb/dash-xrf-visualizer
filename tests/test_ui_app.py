@@ -164,7 +164,7 @@ def _http_callback(app, key, inputs, states, changed):
         "state": [{**item, "value": states.get(f"{item['id']}.{item['property']}",
                           [] if item["id"] == "log" else None)}
                   for item in spec["state"]],
-        "changedPropIds": [changed],
+        "changedPropIds": changed if isinstance(changed, list) else [changed],
     }
     response = app.server.test_client().post("/_dash-update-component", json=body)
     assert response.status_code == 200, response.get_data(as_text=True)
@@ -218,12 +218,34 @@ def test_http_selection_apply_and_figure_refresh(cube):
 
     # A stale zoom must not override the explicit numeric ROI button.
     roi = _http_callback(app, "roi-store.data",
-        {"map.relayoutData": {"xaxis.range[0]": 2, "xaxis.range[1]": 5,
-                              "yaxis.range[0]": 1, "yaxis.range[1]": 3},
+        {"map.relayoutData": {"xaxis.range[0]": 60, "xaxis.range[1]": 80,
+                              "yaxis.range[0]": 0, "yaxis.range[1]": 140},
          "apply-roi.n_clicks": 1},
         {"roi-store.data": [1, 3, 2, 5], "roi-y0.value": 7, "roi-y1.value": 9,
-         "roi-x0.value": 11, "roi-x1.value": 13}, "apply-roi.n_clicks")
+         "roi-x0.value": 11, "roi-x1.value": 13},
+        ["map.relayoutData", "apply-roi.n_clicks"])
     assert roi == [7, 9, 11, 13]
+
+
+def test_apply_roi_zoom_on_unequal_image_axes():
+    h, w, c = 145, 212, 8
+    app = build_app(np.zeros((h, w, c), dtype=np.float32))
+    roi = _http_callback(app, "roi-store.data",
+        {"map.relayoutData": {"xaxis.range[0]": 60, "xaxis.range[1]": 80,
+                              "yaxis.range[0]": 0, "yaxis.range[1]": 140},
+         "apply-roi.n_clicks": 1},
+        {"roi-store.data": [0, h, 0, w], "roi-y0.value": 70, "roi-y1.value": 90,
+         "roi-x0.value": 60, "roi-x1.value": 80},
+        ["map.relayoutData", "apply-roi.n_clicks"])
+    assert roi == [70, 90, 60, 80]
+    fig = _http_callback(app, "map.figure",
+        {"ch-store.data": [0, c], "roi-store.data": roi, "points-store.data": [],
+         "colorscale.value": "Viridis", "log.value": [], "apply-scale.n_clicks": 0,
+         "apply-calibration.n_clicks": 0, "gen.data": 0, "m.value": None, "q.value": None},
+        {"zmin.value": None, "zmax.value": None}, "roi-store.data")
+    assert fig["layout"]["xaxis"]["range"] == [59.5, 79.5]
+    assert fig["layout"]["yaxis"]["range"] == [89.5, 69.5]
+    assert fig["layout"]["yaxis"]["autorange"] is False
 
 
 def test_http_map_controls_and_calibration(cube):
@@ -233,27 +255,32 @@ def test_http_map_controls_and_calibration(cube):
             "colorscale.value": "Viridis", "log.value": [],
             "apply-scale.n_clicks": 0,
             "apply-calibration.n_clicks": 0, "gen.data": 0}
-    states = {"m.value": None, "q.value": None}
-    scale_states = {**states, "zmin.value": 0, "zmax.value": 10}
+    states = {"zmin.value": 0, "zmax.value": 10}
     fig = _http_callback(app, "map.figure", {**base, "apply-scale.n_clicks": 1},
-                         scale_states, "apply-scale.n_clicks")
+                         states, "apply-scale.n_clicks")
     assert fig["layout"]["coloraxis"]["cmin"] == 0
     assert fig["layout"]["coloraxis"]["cmax"] == 10
     calibrated = _http_callback(app, "map.figure",
-        {**base, "apply-calibration.n_clicks": 1}, {"m.value": 0.5, "q.value": 1},
+        {**base, "apply-calibration.n_clicks": 1, "m.value": 0.5, "q.value": 1}, states,
         "apply-calibration.n_clicks")
     assert calibrated["layout"]["title"]["text"] == "Integrated over 1–257 keV"
     spectrum = _http_callback(app, "spectrum.figure",
         {"roi-store.data": [0, H, 0, W], "points-store.data": [], "ch-store.data": [0, C],
-         "log.value": ["log"], "apply-calibration.n_clicks": 1, "gen.data": 0},
-        {"m.value": 0.5, "q.value": 1}, "apply-calibration.n_clicks")
+         "log.value": ["log"], "apply-calibration.n_clicks": 1, "gen.data": 0,
+         "m.value": 0.5, "q.value": 1}, {}, "apply-calibration.n_clicks")
     assert spectrum["layout"]["xaxis"]["title"]["text"] == "E (keV; m=0.5, q=1)"
     assert spectrum["layout"]["xaxis"]["range"] == [0.75, 256.75]
     assert spectrum["layout"]["yaxis"]["title"]["text"] == "log1p(sum counts)"
     message = _http_callback(app, "cal-msg.children",
-        {"apply-calibration.n_clicks": 1}, {"m.value": 0.5, "q.value": 1},
+        {"apply-calibration.n_clicks": 1, "m.value": 0.5, "q.value": 1}, {},
         "apply-calibration.n_clicks")
     assert message == "Applied: E = 0.5 × channel + 1 keV"
+
+    reset_key = next(k for k, spec in app.callback_map.items()
+                     if isinstance(spec["output"], (list, tuple))
+                     and {o.component_id for o in spec["output"]} == {"zmin", "zmax"})
+    assert _http_callback(app, reset_key, {"reset-scale.n_clicks": 1}, {},
+                          "reset-scale.n_clicks") == (None, None)
 
 
 def test_clear_selection_resets_both_plots(cube):
@@ -327,7 +354,7 @@ def test_build_app_empty():
                      "apply-roi", "apply-points", "apply-ch", "clear", "m", "q",
                      "upload", "url", "load-url", "change-file", "load-msg",
                      "apply-calibration", "apply-scale",
-                     "cal-msg", "cube-name", "gen"):
+                     "reset-scale", "cal-msg", "cube-name", "gen"):
         assert expected in ids
     # figures render the empty state without a cube (raw figure, dash 4.5 single-Output)
     f = _cb(app, "map.figure")([0, 0], [0, 0, 0, 0], [], "Viridis", [], 0, 0, 0,
