@@ -94,6 +94,16 @@ def test_build_app(cube):
     assert 'getElementById("q").value' in clientside
 
 
+def test_dark_theme_control_labels_and_reversed_gray_default(cube):
+    app = build_app(cube)
+    colorscale = _component(app.layout, "colorscale")
+    assert colorscale.value == "Greys_r"
+    assert sample_colorscale("Greys_r", [0, 1]) == ["rgb(0, 0, 0)", "rgb(255, 255, 255)"]
+    for component_id in ("log", "elemental-shared-scale"):
+        assert _component(app.layout, component_id).labelStyle["color"] == "var(--bs-body-color)"
+    assert "Pick line" in str(app.layout)
+
+
 def test_legacy_boolean_jupyter_mode_uses_inline(monkeypatch):
     called = {}
     monkeypatch.setattr(Dash, "run", lambda self, *args, **kwargs: called.update(kwargs))

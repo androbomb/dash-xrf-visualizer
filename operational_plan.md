@@ -1,6 +1,6 @@
 # Operational plan — XRF-only visualizer (Dash / Jupyter / JAX)
 
-> **Status:** requirements implemented — M0–M27 completed 2026-11-10/13 (M3–M27 evidence in `timeline.md`).
+> **Status:** requirements implemented — M0–M28 completed 2026-11-10/13 (M3–M28 evidence in `timeline.md`).
 > **Remaining:** Docker/Apptainer user-side tests, GPU validation, deferred items in Section 7. WSLC was reported working by the user.
 > **Repository path seen by Hermes:** `/workspace/exchange/dash-xrf-visualizer`.
 > M0 (read-only audit, 2026-11-10) verified the legacy code and the user-supplied example data; findings are recorded in `scientific_notes.md` and `timeline.md`. The decisions explicitly fixed below must not be reopened unnecessarily.
@@ -194,3 +194,7 @@ These are planning checkpoints, NOT evidence of work performed. Use small revers
 
 - Add any number of `(channel, energy_keV)` pairs, minimum two. Channel is an integer input; energy is parsed from text (decimal comma or point). Two points calculate the exact line; more than two use ordinary least squares. Require distinct channels, finite energies, and positive finite slope. Display full-precision coefficients, update m/q inputs, and apply via the existing calibration store.
 - Verification: two-point, OLS, parsing/precision, invalid input and applied-calibration tests; full suite 64 passed, 1 skipped (GPU).
+
+### M28 — UI cosmetics (completed 2026-11-13)
+
+- Checklist labels use the active Bootstrap body text color; “Pick line” labels the line-selection controls. Default colormap is `Greys_r` (black low counts to white high counts), including map/export fallbacks. Verification: full suite, 65 passed and 1 GPU skip.

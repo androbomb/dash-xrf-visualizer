@@ -37,7 +37,7 @@
 - [x] M17 — Keep map pixels square while enabling arbitrary rectangle selection; size the responsive map frame to the current ROI.
 - [x] M18 — Download the current map/visible ROI as a no-axes, no-colorbar, exact-pixel PNG using the active display colorscale and limits.
 
-## Done — M19–M27: interactions and elemental gallery
+## Done — M19–M28: interactions and elemental gallery
 
 - [x] M19–M23 — Restore map double-click reset paths; ensure Apply calibration captures both current m/q values.
 - [x] M24 — Use plain text calibration inputs (comma or point decimals); transform map scale limits consistently in log mode, including PNG export.
@@ -60,3 +60,5 @@
 - AIRES / model / inference / segmentation UI: removed (not re-asked). Custom raw reader: DEFER.
 
 - [x] M27 — Reference-point calibration: exact two-point line or OLS for N>2; 64 passed, 1 skipped (GPU).
+
+- [x] M28 — Theme-readable controls, line-selection heading, reversed grayscale default; 65 passed, 1 skipped (GPU).

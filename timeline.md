@@ -205,3 +205,9 @@ been performed as part of creating these templates. Do not invent entries.
 
 - **Feature:** dynamic channel/energy point list; integer channels and precision-preserving text energies. Exactly two pairs calculate m/q directly; three or more use OLS. Coefficients are displayed, copied into m/q fields, and applied to existing plots and map features.
 - **Verification:** `.venv/bin/python -m pytest -q` → 64 passed, 1 skipped (GPU); covers direct two-point calculation, multi-point OLS, decimal parsing, invalid channels, and applied coefficients.
+
+
+### 2026-11-13 — M28: UI theme labels and grayscale default (completed)
+
+- Checklist labels now inherit the Bootstrap body text color; added the “Pick line” heading. Map default/fallback colormap is `Greys_r`, mapping low counts to black and high counts to white, for both display and PNG exports.
+- Verification: `.venv/bin/python -m pytest -q` → 65 passed, 1 skipped (GPU).

@@ -62,6 +62,8 @@ parts were removed by decision; the custom CHNet raw reader is deferred.
   the selected interval and visible spatial ROI as one exact-size PNG pixel
   per XRF pixel, with the chosen colorscale/limits/log transform and no axes
   or colorbar.
+- M28 (UI cosmetics) completed 2026-11-13: theme-aware checklist labels,
+  “Pick line” heading, and reversed grayscale default (black low → white high).
 - M27 (reference-point calibration) completed 2026-11-13: two points use
   direct line calculation; three or more use OLS, and the result is applied.
 - M26 (multi-line elemental maps) completed 2026-11-13: calibrated full-field

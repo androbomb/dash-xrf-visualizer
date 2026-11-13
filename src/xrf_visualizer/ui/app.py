@@ -50,7 +50,7 @@ from ..processing import (
     spectrum_from_roi,
 )
 
-_COLORSCALES = ("Viridis", "Plasma", "Hot", "Greys", "Jet")
+_COLORSCALES = ("Greys_r", "Viridis", "Plasma", "Hot", "Jet")
 _ACCENT = "#4196B4"  # legacy infn_lightblue
 _XRF_LINES = load_xrf_lines()
 
@@ -105,7 +105,7 @@ def _png_chunk(kind, data):
             + struct.pack(">I", zlib.crc32(kind + data) & 0xFFFFFFFF))
 
 
-def _map_png_bytes(image, colorscale, zmin=None, zmax=None, log=False):
+def _map_png_bytes(image, colorscale="Greys_r", zmin=None, zmax=None, log=False):
     """Encode one source map value per RGBA PNG pixel, with no plot furniture."""
     image = np.asarray(image, dtype=np.float64)
     if log:
@@ -220,9 +220,9 @@ def _parse_calibration_point(channel, energy):
     return {"channel": int(x), "energy": y}
 
 
-def _elemental_map_figure(image, title, zmin, zmax, colorscale, log):
+def _elemental_map_figure(image, title, zmin, zmax, colorscale="Greys_r", log=False):
     shown = np.log1p(image) if log else image
-    fig = px.imshow(shown, color_continuous_scale=colorscale or "Viridis", aspect="equal",
+    fig = px.imshow(shown, color_continuous_scale=colorscale or "Greys_r", aspect="equal",
                     labels={"x": "x (col)", "y": "y (row)", "color": "sum"})
     if log:
         zmin, zmax = np.log1p(max(0.0, zmin)), np.log1p(max(0.0, zmax))
@@ -294,14 +294,14 @@ def _spectrum_svg_bytes(spectrum, calibration, item, log=False):
 # ------------------------------------------------------------ figure builders
 
 def map_figure(cube, ch_start, ch_end, zmin=None, zmax=None,
-               colorscale="Viridis", log=False, m=None, q=None, roi=None, points=None):
+               colorscale="Greys_r", log=False, m=None, q=None, roi=None, points=None):
     """Current map: plain float64 channel sum, display options applied."""
     image = map_from_channels(cube, ch_start, ch_end)
     if log:
         image = np.log1p(image)
         zmin = np.log1p(max(0.0, float(zmin))) if zmin is not None else None
         zmax = np.log1p(max(0.0, float(zmax))) if zmax is not None else None
-    fig = px.imshow(image, color_continuous_scale=colorscale or "Viridis",
+    fig = px.imshow(image, color_continuous_scale=colorscale or "Greys_r",
                     aspect="equal", labels={"x": "x (col)", "y": "y (row)", "color": "sum"})
     fig.update_layout(dragmode="select")
     if zmin is not None or zmax is not None:
@@ -452,8 +452,10 @@ def build_app(cube=None):
                     dbc.Col([dbc.Label("zmax", html_for="zmax"), dbc.Input(id="zmax", type="number")], width=2),
                     dbc.Col([dbc.Label("colormap", html_for="colorscale"), dcc.Dropdown(id="colorscale",
                                  options=[{"label": n, "value": n} for n in _COLORSCALES],
-                                 value="Viridis")], width=3),
-                    dbc.Col(dcc.Checklist(id="log", options=[{"label": "log", "value": "log"}], value=[]), width=1, className="pt-4"),
+                                 value="Greys_r")], width=3),
+                    dbc.Col(dcc.Checklist(id="log", options=[{"label": "log", "value": "log"}],
+                                          value=[], labelStyle={"color": "var(--bs-body-color)"}),
+                            width=1, className="pt-4"),
                     dbc.Col(dbc.Button("Apply scale", id="apply-scale", n_clicks=0,
                                        size="sm", outline=True, color="info"), width=2),
                     dbc.Col(dbc.Button("Reset scale", id="reset-scale", n_clicks=0,
@@ -512,7 +514,7 @@ def build_app(cube=None):
                     dbc.Col(html.Div(id="cal-point-msg", className="text-info small"), width=12),
                 ]),
                 dbc.Row(className="g-2 align-items-end mt-1", children=[
-                    dbc.Col([dbc.Label("Select Line"), dcc.Dropdown(
+                    dbc.Col([html.B("Pick line"), dbc.Label("Select Line"), dcc.Dropdown(
                         id="line-select", options=[
                             {"label": f"{line['element']} ({line['value']:g} keV)", "value": line["value"]}
                             for line in _XRF_LINES], placeholder="Search XRF line…",
@@ -538,7 +540,7 @@ def build_app(cube=None):
                                outline=True, color="info", disabled=True), width=2),
             dbc.Col(dcc.Checklist(id="elemental-shared-scale", options=[
                 {"label": "Same scale for all", "value": "shared"}],
-                value=["shared"]), width=3),
+                value=["shared"], labelStyle={"color": "var(--bs-body-color)"}), width=3),
             dbc.Col(dbc.Button("Compute", id="elemental-compute", n_clicks=0,
                                outline=True, color="info", disabled=True), width=2),
         ]),
@@ -648,7 +650,7 @@ def build_app(cube=None):
         if image.size == 0:
             return no_update
         scale = scale or {}
-        png = _map_png_bytes(image, colorscale or "Viridis",
+        png = _map_png_bytes(image, colorscale or "Greys_r",
                              scale.get("zmin"), scale.get("zmax"), bool(log))
         return dcc.send_bytes(png, "xrf_map.png")
 
@@ -908,7 +910,7 @@ def build_app(cube=None):
                             f"{item['integration_width_keV']:g}keV_{item_index + 1}.png")
                 spectrum_filename = filename.removesuffix(".png") + "_spectra.svg"
                 bundle.writestr(filename, _map_png_bytes(
-                    image, colorscale or "Viridis", low, high,
+                    image, colorscale or "Greys_r", low, high,
                     bool(log and "log" in log)))
                 bundle.writestr(spectrum_filename, _spectrum_svg_bytes(
                     state["elemental_spectrum"], calibration, item,
@@ -930,7 +932,7 @@ def build_app(cube=None):
                     "cube_shape": list(state["cube"].shape),
                     "spatial_scope": "full field",
                     "scale_mode": "shared" if "shared" in (shared or []) else "per-line autoscale",
-                    "colorscale": colorscale or "Viridis", "log1p": bool(log and "log" in log),
+                    "colorscale": colorscale or "Greys_r", "log1p": bool(log and "log" in log),
                 })
             bundle.writestr("metadata.json", json.dumps(manifest, indent=2).encode("utf-8"))
         return dcc.send_bytes(archive.getvalue(), "elemental_maps.zip"), \
