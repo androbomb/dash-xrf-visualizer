@@ -179,3 +179,8 @@ been performed as part of creating these templates. Do not invent entries.
 - **Fix:** transform raw-count zmin/zmax through the same `log1p` transform as map values, so a previously applied linear scale remains meaningful when log is enabled.
 - **Evidence / diagnosis:** latest user screenshot shows visible m/q values but the old “Enter m” response. Current source uses text inputs and its HTTP test applies m=0.0751, so this is consistent with a notebook importing an older installed package or another checkout. README now documents checking `xrf_visualizer.ui.app.__file__`.
 - **Verification:** UI test confirms data and zmin/zmax are transformed consistently; `uv run pytest -q` → 61 passed, 1 skipped (GPU). Browser/Jupyter interaction remains unavailable here.
+
+### 2026-11-13 — M23: preserve both calibration values and map reset paths
+
+- **Fix:** Apply calibration now reads m and q from the rendered inputs on click and sends them together to the Python callback, instead of depending on potentially stale component State. Plotly's own `doubleClick="reset"` is restored alongside the direct DOM listener as a fallback.
+- **Verification:** UI HTTP tests apply the screenshot's m=0.075, q=0.1191 pair; layout test confirms both Plotly reset config and the direct DOM listener. `uv run pytest -q` → 61 passed, 1 skipped (GPU). Browser/Jupyter interaction remains unavailable here.

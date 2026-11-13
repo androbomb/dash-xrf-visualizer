@@ -318,7 +318,7 @@ def build_app(cube=None):
                 dbc.Col(html.H4("XRF Map", style={"color": _ACCENT}),
                         width={"size": 6, "offset": 3}),
                 html.Div(dcc.Graph(id="map", responsive=True,
-                                   config={"doubleClick": False},
+                                   config={"doubleClick": "reset"},
                                    style={"height": "100%", "width": "100%"}),
                          id="map-frame", style={"width": "100%",
                                                  "aspectRatio": W / H if H else 1}),
@@ -391,6 +391,7 @@ def build_app(cube=None):
         dcc.Store(id="points-store", data=[]),
         dcc.Store(id="scale-store", data={"zmin": None, "zmax": None}),
         dcc.Store(id="cal-store", data=None),
+        dcc.Store(id="cal-input-store", data=None),
         dcc.Store(id="gen", data=0),
         dcc.Download(id="map-download"),
         dcc.Store(id="map-reset-store", data=0),
@@ -429,6 +430,18 @@ def build_app(cube=None):
             return Date.now();
         }""",
         Output("map-bind-store", "data"), Input("map", "figure"),
+    )
+
+    app.clientside_callback(
+        """function(n) {
+            if (!n) return window.dash_clientside.no_update;
+            return {
+                m: document.getElementById("m").value,
+                q: document.getElementById("q").value
+            };
+        }""",
+        Output("cal-input-store", "data"), Input("apply-calibration", "n_clicks"),
+        prevent_initial_call=True,
     )
 
     @app.callback(Output("map-frame", "style"), Input("roi-store", "data"))
@@ -583,11 +596,11 @@ def build_app(cube=None):
 
     @app.callback([Output("cal-store", "data"), Output("cal-msg", "children"),
                    Output("apply-line", "disabled")],
-                  Input("apply-calibration", "n_clicks"),
-                  State("m", "value"), State("q", "value"),
+                  Input("cal-input-store", "data"),
                   prevent_initial_call=True)
-    def _calibration_msg(_n, m, q):
-        if m is None:
+    def _calibration_msg(values):
+        m, q = (values or {}).get("m"), (values or {}).get("q")
+        if m is None or not str(m).strip():
             return no_update, "Enter m (keV/channel) to apply calibration", no_update
         try:
             m, q = float(m), float(q or 0)

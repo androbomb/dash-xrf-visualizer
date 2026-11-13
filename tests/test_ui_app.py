@@ -81,8 +81,10 @@ def test_build_app(cube):
                      "apply-roi", "apply-points", "apply-ch", "clear", "m", "q"):
         assert expected in ids
     clientside = "\n".join(app._inline_scripts)
+    assert _component(app.layout, "map").config["doubleClick"] == "reset"
     assert 'addEventListener("dblclick"' in clientside
     assert 'set_props("map-reset-store"' in clientside
+    assert 'getElementById("q").value' in clientside
 
 
 def test_legacy_boolean_jupyter_mode_uses_inline(monkeypatch):
@@ -334,8 +336,8 @@ def test_http_map_controls_and_calibration(cube):
 
     cal_key = next(k for k, spec in app.callback_map.items() if "cal-store.data" in k)
     calibration, message, apply_line_disabled = _http_callback(app, cal_key,
-        {"apply-calibration.n_clicks": 1}, {"m.value": 0.5, "q.value": 1},
-        "apply-calibration.n_clicks")
+        {"cal-input-store.data": {"m": "0.5", "q": "1"}}, {},
+        "cal-input-store.data")
     assert message == "Applied: E = 0.5 × channel + 1.0 keV"
     assert apply_line_disabled is False
     calibrated = _http_callback(app, "map.figure", {**base, "cal-store.data": calibration},
@@ -370,13 +372,12 @@ def test_calibration_inputs_accept_full_float_precision(cube):
     assert _component(app.layout, "q").type == "text"
     cal_key = next(k for k, spec in app.callback_map.items() if "cal-store.data" in k)
     calibration, message, _ = _http_callback(app, cal_key,
-        {"apply-calibration.n_clicks": 1},
-        {"m.value": "0.0751", "q.value": "0.00345678"},
-        "apply-calibration.n_clicks")
-    assert calibration == {"m": 0.0751, "q": 0.00345678}
-    assert message == "Applied: E = 0.0751 × channel + 0.00345678 keV"
+        {"cal-input-store.data": {"m": "0.075", "q": "0.1191"}}, {},
+        "cal-input-store.data")
+    assert calibration == {"m": 0.075, "q": 0.1191}
+    assert message == "Applied: E = 0.075 × channel + 0.1191 keV"
     fig = spectrum_figure(cube, m=calibration["m"], q=calibration["q"])
-    assert fig.layout.xaxis.title.text == "E (keV; m=0.0751, q=0.00345678)"
+    assert fig.layout.xaxis.title.text == "E (keV; m=0.075, q=0.1191)"
 
 
 def test_download_current_map_is_cropped_pixel_exact_png(cube):
@@ -494,6 +495,7 @@ def test_build_app_empty():
                      "reset-scale", "cal-msg", "line-select", "line-width",
                      "apply-line", "line-selected", "scale-store", "cal-store",
                      "download-map", "map-frame", "map-reset-store", "map-bind-store",
+                     "cal-input-store",
                      "cube-name", "gen"):
         assert expected in ids
     # figures render the empty state without a cube (raw figure, dash 4.5 single-Output)
