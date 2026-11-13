@@ -96,7 +96,9 @@ print(ui_module.__file__)
 
 The path should resolve to this checkout's `src/xrf_visualizer/ui/app.py`.
 If it points to another checkout or `site-packages`, sync that environment and
-restart the kernel before rebuilding the app.
+restart the kernel before rebuilding the app. Updating the file on disk does
+not replace callbacks already captured by an existing `app = build_app(cube)`;
+restart the kernel and recreate `app` after a code update.
 
 ## Data formats
 
