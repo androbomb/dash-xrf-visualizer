@@ -45,7 +45,7 @@
 
 ## Later — not executable in Hermes' current environment
 
-- [ ] Proposed M26 — multi-line elemental-map gallery (awaiting user approval; see Section 7 of `operational_plan.md`). Resolve per-line row/duplicate policy, energy-axis source, and map ROI/scale behavior before implementation.
+- [ ] Proposed M26 — multi-line elemental-map gallery (awaiting user go-ahead; see Section 7 of `operational_plan.md`): unique searchable line rows with widths; require applied calibration; compute full-field pre-analysis maps independent of ROI; shared scale default or per-line autoscale; show range in titles; browse maps and download exact-pixel PNGs in one ZIP. No implementation started.
 
 - [ ] Drag-mode select on the map (deferred by user 2026-11-11): plotly drag-mode selection in addition to zoom = selection; zoom + numeric ROI panel cover the need for now.
 - [ ] Ask user to manually test Docker and Apptainer; WSLC was reported working by the user. Document results without claiming unverified container tests.
