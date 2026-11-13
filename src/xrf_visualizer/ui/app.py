@@ -84,7 +84,7 @@ def _roi_from_relayout(rl, H, W):
     return [y0, y1, x0, x1]
 
 
-def _ch_from_relayout(rl, C):
+def _ch_from_relayout(rl, C, m=None, q=0):
     """Spectrum zoom -> channel interval [s, e] from relayoutData; None = ignore."""
     if not rl:
         return None
@@ -95,6 +95,11 @@ def _ch_from_relayout(rl, C):
     a, b = rl.get("xrange", rl.get("xaxis.range", (
         rl.get("xaxis.range[0]", 0), rl.get("xaxis.range[1]", C))))
     a, b = sorted((a, b))
+    if m is not None:
+        a, b = (a - q) / m, (b - q) / m
+        a, b = sorted((a, b))
+        eps = np.finfo(float).eps * max(1, abs(a), abs(b)) * 4
+        a, b = a + eps, b - eps
     s = max(0, min(int(np.floor(a)), C))
     e = max(0, min(int(np.ceil(b)), C))
     return [s, e]
@@ -318,11 +323,13 @@ def build_app(cube=None):
                     dbc.Col([dbc.Label("Select Line"), dcc.Dropdown(
                         id="line-select", options=[
                             {"label": f"{line['element']} ({line['value']:g} keV)", "value": line["value"]}
-                            for line in _XRF_LINES], placeholder="Search XRF line…", searchable=True)], width=5),
+                            for line in _XRF_LINES], placeholder="Search XRF line…",
+                        searchable=True, clearable=False)], width=5),
                     dbc.Col([dbc.Label("Select width (keV)"), dbc.Input(
                         id="line-width", type="number", min=0, step="any", value=0.1)], width=4),
-                    dbc.Col(dbc.Button("Apply", id="apply-line", n_clicks=0,
+                    dbc.Col(dbc.Button("Apply", id="apply-line", n_clicks=0, disabled=True,
                                        outline=True, color="info"), width=3),
+                    dbc.Col(html.Div(id="line-selected", className="text-info small"), width=12),
                     dbc.Col(html.Div(id="line-msg", className="text-info small"), width=12),
                 ]),
             ]),
@@ -394,8 +401,9 @@ def build_app(cube=None):
                   Input("spectrum", "relayoutData"), Input("apply-ch", "n_clicks"),
                   State("ch-store", "data"),
                   State("ch-s", "value"), State("ch-e", "value"),
+                  State("cal-store", "data"),
                   prevent_initial_call=True)
-    def _set_ch(rl, n, cur, s, e):
+    def _set_ch(rl, n, cur, s, e, calibration):
         c = state["cube"]
         if c is None:
             return cur
@@ -405,7 +413,8 @@ def build_app(cube=None):
             e = max(0, min(int(e or C), C))
             return [min(s, e), max(s, e)]
         if ctx.triggered_id == "spectrum":
-            r = _ch_from_relayout(rl, C)
+            cal = calibration or {}
+            r = _ch_from_relayout(rl, C, cal.get("m"), cal.get("q", 0))
             if r is not None:
                 return r
         return cur
@@ -414,9 +423,9 @@ def build_app(cube=None):
                    Output("line-msg", "children")],
                   Input("apply-line", "n_clicks"),
                   State("line-select", "value"), State("line-width", "value"),
-                  State("cal-store", "data"), State("ch-store", "data"),
+                  State("cal-store", "data"),
                   prevent_initial_call=True)
-    def _apply_line(_n, line_energy, width, calibration, cur):
+    def _apply_line(_n, line_energy, width, calibration):
         if line_energy is None:
             return no_update, "Select an XRF line"
         if not calibration:
@@ -460,20 +469,28 @@ def build_app(cube=None):
         except ValueError as e:
             return no_update, str(e), no_update, no_update
 
-    @app.callback([Output("cal-store", "data"), Output("cal-msg", "children")],
+    @app.callback([Output("cal-store", "data"), Output("cal-msg", "children"),
+                   Output("apply-line", "disabled")],
                   Input("apply-calibration", "n_clicks"),
                   State("m", "value"), State("q", "value"),
                   prevent_initial_call=True)
     def _calibration_msg(_n, m, q):
         if m is None:
-            return no_update, "Enter m (keV/channel) to apply calibration"
+            return no_update, "Enter m (keV/channel) to apply calibration", no_update
         try:
             m, q = float(m), float(q or 0)
             if not math.isfinite(m) or m <= 0 or not math.isfinite(q):
                 raise ValueError
         except (TypeError, ValueError):
-            return no_update, "Enter finite m > 0 and q values"
-        return {"m": m, "q": q}, f"Applied: E = {m:g} × channel + {q:g} keV"
+            return no_update, "Enter finite m > 0 and q values", no_update
+        return {"m": m, "q": q}, f"Applied: E = {m:g} × channel + {q:g} keV", False
+
+    @app.callback(Output("line-selected", "children"), Input("line-select", "value"))
+    def _show_selected_line(value):
+        if value is None:
+            return "No line selected"
+        line = next((line for line in _XRF_LINES if line["value"] == value), None)
+        return f"Selected: {line['element']} — {line['value']:g} keV" if line else ""
 
     @app.callback([Output("scale-store", "data"), Output("zmin", "value"),
                    Output("zmax", "value")],

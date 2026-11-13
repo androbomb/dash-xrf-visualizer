@@ -51,12 +51,15 @@ parts were removed by decision; the custom CHNet raw reader is deferred.
 - M14 (explicit calibration, scale reset, line integration) completed 2026-11-13:
   Apply buttons commit settings to figure state; searchable JSON XRF lines can
   be integrated over a user-set width centered on the selected line energy.
+- M15 (calibrated spectrum selection) completed 2026-11-13: spectrum zoom ranges
+  are converted from keV back to ADC channels; line Apply stays disabled until
+  calibration is applied and the selected line is shown below its menu.
 
 ## Setup (verified 2026-11-10)
 
 ```bash
 uv sync
-  .venv/bin/python -m pytest -q          # 56 passed + 1 GPU skip, CPU only
+  .venv/bin/python -m pytest -q          # 57 passed + 1 GPU skip, CPU only
 .venv/bin/python -m ipykernel install --user --name xrf-viz \
     --display-name "Python 3.12 (xrf-viz)"
 ```
@@ -117,6 +120,9 @@ host, 2026-11-10). GPU is an opt-in, NOT TESTED variant —
   while Reset scale clears the committed limits and their input fields. The
   searchable Select Line menu reads `XRFlines.json`; Apply integrates the
   selected keV width centered on that line (requires an applied calibration).
+- M15: when calibrated, spectrum selections are inverted through `E=m·channel+q`
+  before updating the map's ADC interval. The line-selection Apply button is
+  enabled by successful calibration; the selected line is displayed explicitly.
 - `example.ipynb`: set `path_to_file`, then `build_app(cube)` and
   `app.run(jupyter_mode="inline")` (Dash 4.x); `app.run()` also works from a terminal.
 

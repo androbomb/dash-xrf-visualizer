@@ -1,6 +1,6 @@
 # Operational plan — XRF-only visualizer (Dash / Jupyter / JAX)
 
-> **Status:** requirements implemented — M0–M14 completed 2026-11-10/13 (M3–M14 evidence in `timeline.md`).
+> **Status:** requirements implemented — M0–M15 completed 2026-11-10/13 (M3–M15 evidence in `timeline.md`).
 > **Remaining:** user-side container tests, GPU validation, deferred items in Section 7.
 > **Repository path seen by Hermes:** `/workspace/exchange/dash-xrf-visualizer`.
 > M0 (read-only audit, 2026-11-10) verified the legacy code and the user-supplied example data; findings are recorded in `scientific_notes.md` and `timeline.md`. The decisions explicitly fixed below must not be reopened unnecessarily.

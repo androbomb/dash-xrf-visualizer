@@ -135,3 +135,9 @@ been performed as part of creating these templates. Do not invent entries.
 - **Root cause:** scale fields were callback `State`, so clearing them did not refresh the figure; calibration controls fed values into figure callbacks but “Apply calibration” did not commit a distinct applied calibration state.
 - **Fix:** Apply scale commits zmin/zmax to a store; Reset scale clears that store and the visible inputs. Apply calibration validates and commits m/q to a store consumed by both plots. Added a searchable dropdown populated from `XRFlines.json`, a width input in keV, and Apply; it converts the requested energy window around the selected line to half-open ADC channel bounds and updates the map interval.
 - **Verification:** `uv run pytest -q` → 56 passed, 1 skipped (GPU); UI tests cover applied/reset scale, calibration store and figure axes, and line-centered channel integration. `git diff --check` is clean.
+
+### 2026-11-13 — M15: calibrated spectrum selection (completed)
+
+- **Root cause:** after calibration, Plotly emits spectrum relayout bounds in keV, but the map interval callback treated them as ADC channel indices.
+- **Fix:** inverse-transform selected bounds with `(E-q)/m`, with floating-point edge tolerance, before updating the channel interval. The XRF-line Apply button is disabled until calibration is applied, and a persistent label repeats the chosen line and energy.
+- **Verification:** `uv run pytest -q` → 57 passed, 1 skipped (GPU); UI HTTP test maps a calibrated energy selection back to expected channels, and tests verify line button enablement and the selected-line label. `git diff --check` is clean.

@@ -272,10 +272,11 @@ def test_http_map_controls_and_calibration(cube):
     assert "cmax" not in reset_fig["layout"]["coloraxis"]
 
     cal_key = next(k for k, spec in app.callback_map.items() if "cal-store.data" in k)
-    calibration, message = _http_callback(app, cal_key,
+    calibration, message, apply_line_disabled = _http_callback(app, cal_key,
         {"apply-calibration.n_clicks": 1}, {"m.value": 0.5, "q.value": 1},
         "apply-calibration.n_clicks")
     assert message == "Applied: E = 0.5 × channel + 1 keV"
+    assert apply_line_disabled is False
     calibrated = _http_callback(app, "map.figure", {**base, "cal-store.data": calibration},
                                  {}, "cal-store.data")
     assert calibrated["layout"]["title"]["text"] == "Integrated over 1–257 keV"
@@ -293,9 +294,13 @@ def test_xrf_line_select_applies_calibrated_energy_width(cube):
     line_key = next(k for k, spec in app.callback_map.items() if "line-msg.children" in k)
     out = _http_callback(app, line_key, {"apply-line.n_clicks": 1},
         {"line-select.value": 1.486, "line-width.value": 0.2,
-         "cal-store.data": {"m": 0.01, "q": 0}, "ch-store.data": [0, C]},
+         "cal-store.data": {"m": 0.01, "q": 0}},
         "apply-line.n_clicks")
     assert out == ([139, 159], "Integrating 1.486 ± 0.1 keV")
+    selected_key = next(k for k, spec in app.callback_map.items()
+                        if "line-selected.children" in k)
+    assert _http_callback(app, selected_key, {"line-select.value": 1.486}, {},
+                          "line-select.value") == "Selected: Al (Ka) — 1.486 keV"
 
 
 def test_clear_selection_resets_both_plots(cube):
@@ -357,6 +362,18 @@ def test_http_spectrum_zoom_updates_map_and_interval_button(cube):
     assert selected_spectrum["layout"]["xaxis"]["range"] == [9.5, 19.5]
 
 
+def test_calibrated_spectrum_zoom_maps_energy_back_to_channels(cube):
+    app = build_app(cube)
+    m, q = 0.0023, 0.0036
+    channels = _http_callback(app, "ch-store.data",
+        {"spectrum.relayoutData": {"xaxis.range[0]": m * 100 + q,
+                                    "xaxis.range[1]": m * 120 + q},
+         "apply-ch.n_clicks": 0},
+        {"ch-store.data": [0, C], "ch-s.value": 0, "ch-e.value": C,
+         "cal-store.data": {"m": m, "q": q}}, "spectrum.relayoutData")
+    assert channels == [100, 120]
+
+
 @pytest.fixture
 def empty_app():
     return build_app(None)
@@ -370,7 +387,7 @@ def test_build_app_empty():
                      "upload", "url", "load-url", "change-file", "load-msg",
                      "apply-calibration", "apply-scale",
                      "reset-scale", "cal-msg", "line-select", "line-width",
-                     "apply-line", "scale-store", "cal-store", "cube-name", "gen"):
+                     "apply-line", "line-selected", "scale-store", "cal-store", "cube-name", "gen"):
         assert expected in ids
     # figures render the empty state without a cube (raw figure, dash 4.5 single-Output)
     f = _cb(app, "map.figure")([0, 0], [0, 0, 0, 0], [], "Viridis", [],
