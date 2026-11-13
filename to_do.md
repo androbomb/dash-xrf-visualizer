@@ -46,7 +46,7 @@
 
 ## Later — not executable in Hermes' current environment
 
-- [ ] PyPI release: recheck `chnet-xrf-visualizer` availability, confirm license
+- [ ] PyPI release: recheck `xrf-visualizer` availability, confirm license
   copyright holder, complete metadata, test wheel/install on supported Python
   versions, then configure GitHub Trusted Publishing. Guide:
   `deploy/how_to_deploy_pip.md`.

@@ -85,7 +85,7 @@ Requires [uv](https://docs.astral.sh/uv/); Python 3.12 is managed by uv via
 **Python 3.12 (xrf-viz)**.
 
 The project is not published to PyPI yet. The planned pip distribution name is
-`chnet-xrf-visualizer`; see [`deploy/how_to_deploy_pip.md`](deploy/how_to_deploy_pip.md)
+`xrf-visualizer`; see [`deploy/how_to_deploy_pip.md`](deploy/how_to_deploy_pip.md)
 for the end-user install instructions and maintainer release checklist. `uv`
 remains available as the lockfile-based development/Jupyter workflow.
 The project license is MIT; see [`LICENSE`](LICENSE).

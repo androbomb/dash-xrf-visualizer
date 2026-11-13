@@ -2,7 +2,7 @@
 
 This is the pip-based alternative to the repository's `uv` workflow. It is a
 deployment guide and release checklist; **the project is not published on
-PyPI yet**, so `pip install chnet-xrf-visualizer` will work only after the
+   PyPI yet**, so `pip install xrf-visualizer` will work only after the
 first release.
 
 ## End-user install (after publication)
@@ -30,9 +30,10 @@ variant.
 
 ## Before the first release
 
-1. The PyPI JSON endpoint returned HTTP 404 for `chnet-xrf-visualizer` on
-   2026-11-13, so no project was listed then. This does not reserve the name;
-   recheck immediately before publishing. The distribution name is now set in
+1. PyPI's JSON endpoint returned HTTP 404 for both `chnet-xrf-visualizer` and
+   `xrf-visualizer` on 2026-11-13, so neither project was listed then. This
+   does not reserve the name; recheck immediately before publishing. The
+   distribution name is now set in
    `pyproject.toml`; the source import remains `xrf_visualizer`, so the source
    directory does not need renaming.
 2. MIT is now recorded in `LICENSE` and `pyproject.toml`. Before the first
