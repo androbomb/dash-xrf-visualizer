@@ -44,7 +44,8 @@ parts were removed by decision; the custom CHNet raw reader is deferred.
   log1p to spectrum counts as well as map counts.
 - M12 (scale, clear, calibration) completed 2026-11-12: zmin/zmax apply to
   Plotly's shared color axis; Clear selection resets points, ROI and channels;
-  calibration confirms and displays the active m/q values.
+  calibration confirms and displays the active m/q values. In log mode, the
+  raw-count zmin/zmax are transformed with the map using `log1p`.
 - M13 (calibration refresh, ROI zoom, scale reset) completed 2026-11-13:
   Apply ROI disables `imshow` autorange so both numeric axes zoom to the
   requested box; Reset scale clears zmin/zmax.
@@ -84,6 +85,18 @@ app.run(jupyter_mode="inline", debug=False, jupyter_height=1000)
 
 `jupyter_height` is an integer number of pixels; raise it further if the
 notebook still scrolls inside the embedded app.
+
+If a notebook keeps showing old UI behavior after updating the checkout, check
+which module the kernel imported:
+
+```python
+import xrf_visualizer.ui.app as ui_module
+print(ui_module.__file__)
+```
+
+The path should resolve to this checkout's `src/xrf_visualizer/ui/app.py`.
+If it points to another checkout or `site-packages`, sync that environment and
+restart the kernel before rebuilding the app.
 
 ## Data formats
 

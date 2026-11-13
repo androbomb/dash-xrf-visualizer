@@ -173,3 +173,9 @@ been performed as part of creating these templates. Do not invent entries.
 
 - **Fix:** bind a native DOM double-click listener to the stable Dash map root and route it through the ROI reset store; disable Plotly's competing double-click action. Use decimal text inputs for m/q to avoid browser numeric-step validation while retaining server-side finite-value checks and float precision.
 - **Verification:** UI test confirms the clientside listener is registered and m=0.0751 reaches the calibration store; `uv run pytest -q` → 61 passed, 1 skipped (GPU). Browser/Jupyter runtime remains unverified because no browser is installed here.
+
+### 2026-11-13 — M22: log color limits and stale-kernel diagnosis
+
+- **Fix:** transform raw-count zmin/zmax through the same `log1p` transform as map values, so a previously applied linear scale remains meaningful when log is enabled.
+- **Evidence / diagnosis:** latest user screenshot shows visible m/q values but the old “Enter m” response. Current source uses text inputs and its HTTP test applies m=0.0751, so this is consistent with a notebook importing an older installed package or another checkout. README now documents checking `xrf_visualizer.ui.app.__file__`.
+- **Verification:** UI test confirms data and zmin/zmax are transformed consistently; `uv run pytest -q` → 61 passed, 1 skipped (GPU). Browser/Jupyter interaction remains unavailable here.

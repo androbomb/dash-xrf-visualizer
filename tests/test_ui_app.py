@@ -99,6 +99,10 @@ def test_map_figure_matches_golden(cube, golden):
     assert z.dtype == np.float64
     fig2 = map_figure(cube, 0, C, zmin=1, zmax=1e6, colorscale="Hot", log=True)
     assert np.asarray(fig2.data[0]["z"]).shape == (H, W)
+    np.testing.assert_allclose(np.asarray(fig2.data[0]["z"]),
+                               np.log1p(map_from_channels(cube, 0, C)))
+    assert fig2.layout.coloraxis.cmin == pytest.approx(np.log1p(1))
+    assert fig2.layout.coloraxis.cmax == pytest.approx(np.log1p(1e6))
     assert "100–120 ADC channels" in fig.layout.title.text
     assert "7.96–9.452 keV" in map_figure(cube, 100, 120, m=0.0746, q=0.5).layout.title.text
     assert fig.layout.xaxis.scaleanchor == "y"

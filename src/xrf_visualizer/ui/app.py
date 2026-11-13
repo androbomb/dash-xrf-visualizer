@@ -172,8 +172,10 @@ def map_figure(cube, ch_start, ch_end, zmin=None, zmax=None,
                colorscale="Viridis", log=False, m=None, q=None, roi=None, points=None):
     """Current map: plain float64 channel sum, display options applied."""
     image = map_from_channels(cube, ch_start, ch_end)
-    if log:  # shortcut: log via data transform; zmin/zmax then apply to log1p values
+    if log:
         image = np.log1p(image)
+        zmin = np.log1p(max(0.0, float(zmin))) if zmin is not None else None
+        zmax = np.log1p(max(0.0, float(zmax))) if zmax is not None else None
     fig = px.imshow(image, color_continuous_scale=colorscale or "Viridis",
                     aspect="equal", labels={"x": "x (col)", "y": "y (row)", "color": "sum"})
     fig.update_layout(dragmode="select")
