@@ -184,3 +184,8 @@ been performed as part of creating these templates. Do not invent entries.
 
 - **Fix:** Apply calibration now reads m and q from the rendered inputs on click and sends them together to the Python callback, instead of depending on potentially stale component State. Plotly's own `doubleClick="reset"` is restored alongside the direct DOM listener as a fallback.
 - **Verification:** UI HTTP tests apply the screenshot's m=0.075, q=0.1191 pair; layout test confirms both Plotly reset config and the direct DOM listener. `uv run pytest -q` → 61 passed, 1 skipped (GPU). Browser/Jupyter interaction remains unavailable here.
+
+### 2026-11-13 — M24: plain text calibration inputs and log-scale regression (implemented)
+
+- **Docs check:** official Dash/dbc docs show input `value` accepts strings or numbers; the invalid-value-to-`None` behavior applies to numeric inputs, and `inputMode` is only a browser hint. Replaced m/q with Dash Core `dcc.Input(type="text")`; parser accepts both decimal commas and points.
+- **Fix / verification:** regression covers m=0,075, q=0,1199 and applying log while raw-count zmax=2000 is committed; HTTP figure returns coloraxis limits transformed with `log1p`. Full suite: `uv run pytest -q` → 61 passed, 1 skipped (GPU).

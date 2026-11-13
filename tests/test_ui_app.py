@@ -324,6 +324,11 @@ def test_http_map_controls_and_calibration(cube):
     fig = _http_callback(app, "map.figure", base, {}, "scale-store.data")
     assert fig["layout"]["coloraxis"]["cmin"] == 0
     assert fig["layout"]["coloraxis"]["cmax"] == 10
+    log_fig = _http_callback(app, "map.figure",
+        {**base, "log.value": ["log"], "scale-store.data": {"zmin": 1, "zmax": 2000}},
+        {}, "log.value")
+    assert log_fig["layout"]["coloraxis"]["cmin"] == pytest.approx(np.log1p(1))
+    assert log_fig["layout"]["coloraxis"]["cmax"] == pytest.approx(np.log1p(2000))
 
     reset, zmin, zmax = _http_callback(app, scale_key,
         {"apply-scale.n_clicks": 1, "reset-scale.n_clicks": 1},
@@ -368,16 +373,18 @@ def test_xrf_line_select_applies_calibrated_energy_width(cube):
 
 def test_calibration_inputs_accept_full_float_precision(cube):
     app = build_app(cube)
+    assert _component(app.layout, "m").to_plotly_json()["namespace"] == "dash_core_components"
+    assert _component(app.layout, "q").to_plotly_json()["namespace"] == "dash_core_components"
     assert _component(app.layout, "m").type == "text"
     assert _component(app.layout, "q").type == "text"
     cal_key = next(k for k, spec in app.callback_map.items() if "cal-store.data" in k)
     calibration, message, _ = _http_callback(app, cal_key,
-        {"cal-input-store.data": {"m": "0.075", "q": "0.1191"}}, {},
+        {"cal-input-store.data": {"m": "0,075", "q": "0,1199"}}, {},
         "cal-input-store.data")
-    assert calibration == {"m": 0.075, "q": 0.1191}
-    assert message == "Applied: E = 0.075 × channel + 0.1191 keV"
+    assert calibration == {"m": 0.075, "q": 0.1199}
+    assert message == "Applied: E = 0.075 × channel + 0.1199 keV"
     fig = spectrum_figure(cube, m=calibration["m"], q=calibration["q"])
-    assert fig.layout.xaxis.title.text == "E (keV; m=0.075, q=0.1191)"
+    assert fig.layout.xaxis.title.text == "E (keV; m=0.075, q=0.1199)"
 
 
 def test_download_current_map_is_cropped_pixel_exact_png(cube):

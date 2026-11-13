@@ -365,8 +365,10 @@ def build_app(cube=None):
                 ]),
                 html.B("Calibration (keV = m × channel + q)"),
                 dbc.Row(className="g-2 align-items-end", children=[
-                    dbc.Col([dbc.Label("m", html_for="m"), dbc.Input(id="m", type="text", inputMode="decimal")], width=6),
-                    dbc.Col([dbc.Label("q", html_for="q"), dbc.Input(id="q", type="text", inputMode="decimal")], width=6),
+                    dbc.Col([dbc.Label("m", html_for="m"), dcc.Input(
+                        id="m", type="text", value="", className="form-control")], width=6),
+                    dbc.Col([dbc.Label("q", html_for="q"), dcc.Input(
+                        id="q", type="text", value="", className="form-control")], width=6),
                     dbc.Col(dbc.Button("Apply calibration", id="apply-calibration", n_clicks=0, outline=True, color="info"), width=12),
                     dbc.Col(html.Div(id="cal-msg", className="text-info small"), width=12),
                 ]),
@@ -603,7 +605,8 @@ def build_app(cube=None):
         if m is None or not str(m).strip():
             return no_update, "Enter m (keV/channel) to apply calibration", no_update
         try:
-            m, q = float(m), float(q or 0)
+            m = float(str(m).strip().replace(",", "."))
+            q = float(str(q).strip().replace(",", ".")) if q and str(q).strip() else 0.0
             if not math.isfinite(m) or m <= 0 or not math.isfinite(q):
                 raise ValueError
         except (TypeError, ValueError):

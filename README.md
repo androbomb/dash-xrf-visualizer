@@ -107,7 +107,8 @@ restart the kernel and recreate `app` after a code update.
 - `.npy`: single 3-D array, channel (ADC) axis only.
 - Uncalibrated files display the channel axis; the UI provides manual
   calibration `E(i) = m·i + q` (m in keV/channel, q in keV); m and q accept
-  arbitrary decimal precision using decimal text inputs.
+  arbitrary decimal precision in plain text fields; decimal commas and points
+  are accepted.
 - Examples (real data, git-ignored): `data_example/`.
 
 ## Compute
