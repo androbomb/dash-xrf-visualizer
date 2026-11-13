@@ -75,7 +75,7 @@ parts were removed by decision; the custom CHNet raw reader is deferred.
 
 ```bash
 uv sync
-.venv/bin/python -m pytest -q             # latest: 63 passed + 1 GPU skip
+.venv/bin/python -m pytest -q             # latest: 65 passed + 1 GPU skip
 .venv/bin/python -m ipykernel install --user --name xrf-viz \
     --display-name "Python 3.12 (xrf-viz)"
 ```
@@ -83,6 +83,11 @@ uv sync
 Requires [uv](https://docs.astral.sh/uv/); Python 3.12 is managed by uv via
 `.python-version`. In Jupyter/JupyterLab select the kernel
 **Python 3.12 (xrf-viz)**.
+
+The project is not published to PyPI yet. The planned pip distribution name is
+`chnet-xrf-visualizer`; see [`deploy/how_to_deploy_pip.md`](deploy/how_to_deploy_pip.md)
+for the end-user install instructions and maintainer release checklist. `uv`
+remains available as the lockfile-based development/Jupyter workflow.
 
 Dash's inline notebook frame defaults to 650 px tall. Increase it to avoid an
 inner vertical scrollbar when the UI needs more space, for example:
@@ -217,5 +222,6 @@ pyproject.toml / uv.lock / .python-version   uv project (root, versioned)
 src/xrf_visualizer/                          data / processing / ui (M2–M4)
 tests/                                       pytest; fixtures/ + golden.json
 deploy/{docker,wslc,apptainer,uv}/           recipes & how-tos (Docker/Apptainer NOT TESTED)
+deploy/how_to_deploy_pip.md                  planned PyPI release + pip install guide
 dash-xrf-analyzer/                           legacy reference (git-ignored, read-only)
 ```
