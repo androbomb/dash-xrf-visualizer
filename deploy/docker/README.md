@@ -25,5 +25,6 @@ Then open http://localhost:8765. Tests are not installed in the image
 (`uv sync --frozen --no-dev`); add the `dev` group inside the container if
 needed.
 
-UI behavior includes calibration-aware spectrum selection and selectable XRF
-line windows; local/inline notebook sizing is documented in `../uv/README.md`.
+UI behavior includes free rectangular map selection, calibration-aware
+spectrum selection, selectable XRF line windows, and exact-pixel PNG export;
+local/inline notebook sizing is documented in `../uv/README.md`.

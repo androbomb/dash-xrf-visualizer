@@ -58,12 +58,13 @@ step.
 - [ ] `apptainer build` succeeds.
 - [ ] Page loads at `http://localhost:8765` (map left, spectrum right).
 - [ ] Empty start (no `XRF_CUBE`) → upload a `.npz`/`.h5`/`.npy` (or paste a link) → map and spectrum appear (M6).
-- [ ] Zoom the map → spectrum updates; zoom the spectrum → map updates.
+- [ ] Draw a rectangular selection on the map → spectrum updates; zoom the spectrum → map updates.
 - [ ] `autorange` resets to full field/interval.
 - [ ] Numeric ROI panel and multi-point panels work (error msg on bad input).
 - [ ] `m`/`q` calibration switches the spectrum axis to keV.
 - [ ] With calibration applied, zooming the spectrum updates the matching channel interval on the map.
 - [ ] Select an XRF line and width → Apply selects its centered window; Reset scale clears zmin/zmax.
+- [ ] Download current map → PNG dimensions equal selected matrix dimensions, with no axes/colorbar.
 
 ## Result log (fill in after your test)
 

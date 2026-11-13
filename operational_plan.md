@@ -1,6 +1,6 @@
 # Operational plan — XRF-only visualizer (Dash / Jupyter / JAX)
 
-> **Status:** requirements implemented — M0–M15 completed 2026-11-10/13 (M3–M15 evidence in `timeline.md`).
+> **Status:** requirements implemented — M0–M18 completed 2026-11-10/13 (M3–M18 evidence in `timeline.md`).
 > **Remaining:** Docker/Apptainer user-side tests, GPU validation, deferred items in Section 7. WSLC was reported working by the user.
 > **Repository path seen by Hermes:** `/workspace/exchange/dash-xrf-visualizer`.
 > M0 (read-only audit, 2026-11-10) verified the legacy code and the user-supplied example data; findings are recorded in `scientific_notes.md` and `timeline.md`. The decisions explicitly fixed below must not be reopened unnecessarily.
@@ -17,7 +17,7 @@ The deliverable is **an XRF-only data visualizer**, NOT a machine-learning appli
 | Left panel: XRF image | **KEEP** | Derive 2-D intensity image from user-selected spectral interval. |
 | Right panel: XRF spectrum | **KEEP** | Display spectrum for current spatial region (initially full field). |
 | Spectral interval / energy ROI | **KEEP** | Changing interval recomputes the elemental/intensity map. Respect legacy bin/energy semantics. |
-| Spatial ROI selection/zoom | **KEEP** | Approved 2026-11-10: image zoom → new spectrum, spectrum zoom → new map (legacy semantics), plus explicit selection modes (drag select, numeric panel, multi-point) in M4; `autorange` = reset. |
+| Spatial ROI selection/zoom | **KEEP** | Map rectangle selection → new spectrum, spectrum zoom → new map; explicit numeric and multi-point selection; `autorange` = reset. |
 | AIRES and all model/inference UI/code | **REMOVE** | Explicit user decision; preserve legacy baseline/evidence first. No need to ask again if a component is unambiguously AIRES-only. |
 | Legacy custom-file reader | **DEFER** | Record findings; do not port now unless necessary for retained formats. |
 | Everything else | **EVALUATE** | Classify only unknown/ambiguous functionality. |
@@ -28,10 +28,12 @@ The provided example XRF file may be inspected only via lightweight metadata or 
 
 - Load a path supplied as a Python variable in a Jupyter notebook: `path_to_file = "/path/to/file"`. No hardcoded input paths or CLI-only workflow.
 - Render a **left image panel** and a **right spectral panel**. Preserve axes, labels, units, and metadata as discoverable.
+- Preserve square map pixels at every viewport size while allowing arbitrary rectangular ROI selection; resize the map frame to the selected ROI ratio.
+- Download the current channel-sum map as a PNG cropped to the visible spatial ROI, with one image pixel per XRF pixel, current colorscale/limits/log display, and no plot axes or colorbar.
 - A selected spectral interval updates the spatial map via a scientifically correct reduction/integration along the spectral axis.
 - Manual calibration `E(i)=m·i+q` changes the plotted spectrum axis only. Plot zoom ranges in keV are converted back to ADC channel indices before updating the map interval.
 - The searchable XRF line catalog supports selecting a line and positive width in keV; Apply selects channel bins whose calibrated channel-center energies fall within that window. The reduction remains a discrete plain sum, not energy-width-weighted integration.
-- A selected spatial region updates the spectrum via a scientifically correct reduction over the selected pixels. **Zoom is selection** (approved 2026-11-10, legacy semantics): zooming the image recomputes the spectrum for the zoomed region; zooming the spectrum recomputes the map for the zoomed interval. Explicit selection modes (drag-mode select, numeric input panel, multi-point list) are additive in M4; `autorange`/double-click resets to the full field/interval.
+- A selected spatial region updates the spectrum via a scientifically correct reduction over the selected pixels. Dragging an arbitrary rectangle on the map sets the spatial ROI; zooming the spectrum recomputes the map for the selected channel interval. Numeric ROI and multi-point selection are also supported; `autorange`/double-click resets to the full field/interval.
 - Initial full-field/full-spectrum selection, empty ROIs, zero counts, NaNs, nonuniform energy grids, and repeated selections must be handled deterministically.
 - Distinguish **sum of counts** over energy channels from **integral with energy-bin widths**; use the legacy convention or a documented, approved scientific choice. Avoid silent conversion between channel and energy units.
 

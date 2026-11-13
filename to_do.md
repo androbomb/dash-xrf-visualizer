@@ -1,7 +1,7 @@
 # XRF-only visualizer — project to-do
 
 > Future requirements are user decisions, not verified legacy implementation.
-> M0–M15 completed 2026-11-10/13 (evidence in `timeline.md`).
+> M0–M18 completed 2026-11-10/13 (evidence in `timeline.md`).
 
 ## Now — M1 baseline + approved docs (completed 2026-11-10)
 
@@ -34,6 +34,8 @@
 - [x] M13 — Fix ROI zoom bounds and scale reset; confirm calibration behavior on real Ragazzo-triste data.
 - [x] M14 — Commit calibration and scale settings only on their buttons; add searchable `XRFlines.json` selection and width-centered channel integration.
 - [x] M15 — Convert calibrated spectrum selections from keV back to ADC channels; gate line Apply on calibration and show the selected line.
+- [x] M17 — Keep map pixels square while enabling arbitrary rectangle selection; size the responsive map frame to the current ROI.
+- [x] M18 — Download the current map/visible ROI as a no-axes, no-colorbar, exact-pixel PNG using the active display colorscale and limits.
 
 ## Later — not executable in Hermes' current environment
 

@@ -34,6 +34,10 @@ the read-only audit of 2026-11-10 (legacy code + example files); facts marked
   `[E_line-w/2, E_line+w/2]`; the map still uses an unweighted discrete sum of
   those channels. The line catalog supplies reference energies, not detector
   calibration.
+- **Map PNG export:** the export uses the current channel-sum matrix (and
+  visible spatial ROI, if selected), maps each value through the active
+  colorscale/limits/log transform, and writes exactly one RGBA PNG pixel per
+  matrix element. No interpolation, axes, colorbar, or point markers are added.
 - Historical notes (context only, not reused):
   - Legacy hardcoded `0.5–38.5 keV` over all channels (`RendererXRF._E_int`,
     `BASIC_ENERGY_RANGE_FOR_CALIBRATION`); user-confirmed as a remnant of

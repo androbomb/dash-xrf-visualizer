@@ -33,7 +33,7 @@ parts were removed by decision; the custom CHNet raw reader is deferred.
   explicit calibration button, and plot titles showing integrated channel/energy
   range and spectrum selection. Calibration changes only the plotted X axis.
 - M9 (callback behavior + notebook compatibility) completed 2026-11-12: explicit
-  selection buttons now take precedence over stale graph zoom state; browser-level
+  selection buttons now take precedence over stale graph zoom state; HTTP
   callback tests cover ROI/interval propagation, color limits and calibration.
   Dash 4.x notebooks use `jupyter_mode="inline"` (not boolean `True`).
 - M10 (selection zoom + controls) completed 2026-11-12: Apply ROI/interval also
@@ -54,12 +54,19 @@ parts were removed by decision; the custom CHNet raw reader is deferred.
 - M15 (calibrated spectrum selection) completed 2026-11-13: spectrum zoom ranges
   are converted from keV back to ADC channels; line Apply stays disabled until
   calibration is applied and the selected line is shown below its menu.
+- M17 (square map pixels and arbitrary ROI) completed 2026-11-13: rectangular
+  drag selection accepts any shape, and the responsive map frame follows the
+  selected ROI ratio while keeping square pixels.
+- M18 (download map PNG) completed 2026-11-13: Download current map exports
+  the selected interval and visible spatial ROI as one exact-size PNG pixel
+  per XRF pixel, with the chosen colorscale/limits/log transform and no axes
+  or colorbar.
 
 ## Setup
 
 ```bash
 uv sync
-.venv/bin/python -m pytest -q             # latest: 57 passed + 1 GPU skip
+.venv/bin/python -m pytest -q             # latest: 60 passed + 1 GPU skip
 .venv/bin/python -m ipykernel install --user --name xrf-viz \
     --display-name "Python 3.12 (xrf-viz)"
 ```
@@ -103,10 +110,10 @@ host, 2026-11-10). GPU is an opt-in, NOT TESTED variant —
 - Left: 2-D map (heatmap); zmin/zmax, colorscale, log controls.
 - Right: spectrum (keV axis when `m` is set, otherwise channel (ADC) vs
   sum counts).
-- **Zoom = selection** (legacy semantics, via plotly `relayoutData`): image
-  zoom → new spectrum; spectrum zoom → new map; `autorange` resets to full
-  field. Pan emits the same ranges signal, so panning also moves the
-  selection (known limitation of the relayout-based design).
+- **Selection:** rectangle-drag on the map updates the spectrum and crops the
+  map view; the map frame follows the ROI aspect ratio. Zooming the spectrum
+  updates the map interval. Double-click/autorange resets to the full field or
+  spectrum range.
 - Explicit selection: numeric ROI panel (y0, y1, x0, x1), multi-point
   (rows + cols), numeric channel interval. Manual calibration panel
   (`m`, `q`); invalid points report an error message and keep the previous
@@ -132,6 +139,12 @@ host, 2026-11-10). GPU is an opt-in, NOT TESTED variant —
 - M15: when calibrated, spectrum selections are inverted through `E=m·channel+q`
   before updating the map's ADC interval. The line-selection Apply button is
   enabled by successful calibration; the selected line is displayed explicitly.
+- M17: rectangle-drag accepts arbitrary ROI aspect ratios; the map frame's CSS
+  aspect ratio follows the selected ROI while Plotly keeps x/y scales equal.
+- M18: Download current map writes the current channel sum and visible spatial
+  crop as a lossless PNG with one square image pixel per matrix element. The
+  chosen colorscale, zmin/zmax and log transform are applied; axes/colorbar and
+  point markers are not included.
 - `example.ipynb`: set `path_to_file`, then `build_app(cube)` and
   `app.run(jupyter_mode="inline", jupyter_height=1000)` (Dash 4.x); the height
   is in pixels. `app.run()` also works from a terminal.

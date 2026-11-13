@@ -27,12 +27,15 @@ dash-bootstrap-components DARKLY theme, #4196B4 navbar, fluid container,
 import base64
 import math
 import re
+import struct
+import zlib
 from pathlib import Path
 
 import dash_bootstrap_components as dbc
 import numpy as np
 import plotly.express as px
 import plotly.graph_objects as go
+from plotly.colors import sample_colorscale
 from dash import Dash, Input, Output, State, ctx, dcc, html, no_update
 
 from ..data import download_cube, load_cube_bytes, load_xrf_lines
@@ -84,6 +87,45 @@ def _roi_from_relayout(rl, H, W):
     return [y0, y1, x0, x1]
 
 
+def _roi_from_selection(selection, H, W):
+    if not selection or not selection.get("range"):
+        return None
+    ranges = selection["range"]
+    if "x" not in ranges or "y" not in ranges:
+        return None
+    return _roi_from_relayout({"xrange": ranges["x"], "yrange": ranges["y"]}, H, W)
+
+
+def _png_chunk(kind, data):
+    return (struct.pack(">I", len(data)) + kind + data
+            + struct.pack(">I", zlib.crc32(kind + data) & 0xFFFFFFFF))
+
+
+def _map_png_bytes(image, colorscale, zmin=None, zmax=None):
+    """Encode one source map value per RGBA PNG pixel, with no plot furniture."""
+    image = np.asarray(image, dtype=np.float64)
+    valid = np.isfinite(image)
+    if valid.any():
+        low = float(zmin) if zmin is not None else float(image[valid].min())
+        high = float(zmax) if zmax is not None else float(image[valid].max())
+    else:
+        low, high = 0.0, 1.0
+    if high == low:
+        scaled = np.full(image.shape, 0.5)
+    else:
+        scaled = np.clip((image - low) / (high - low), 0, 1)
+    scaled = np.nan_to_num(scaled, nan=0.0, posinf=1.0, neginf=0.0)
+    rgb = np.rint(np.asarray(sample_colorscale(
+        colorscale, scaled.ravel().tolist(), colortype="tuple")).reshape(*image.shape, 3) * 255
+    ).astype(np.uint8)
+    rgba = np.dstack((rgb, np.where(valid, 255, 0).astype(np.uint8)))
+    height, width = image.shape
+    rows = b"".join(b"\x00" + rgba[row].tobytes() for row in range(height))
+    header = struct.pack(">IIBBBBB", width, height, 8, 6, 0, 0, 0)
+    return (b"\x89PNG\r\n\x1a\n" + _png_chunk(b"IHDR", header)
+            + _png_chunk(b"IDAT", zlib.compress(rows)) + _png_chunk(b"IEND", b""))
+
+
 def _ch_from_relayout(rl, C, m=None, q=0):
     """Spectrum zoom -> channel interval [s, e] from relayoutData; None = ignore."""
     if not rl:
@@ -133,7 +175,8 @@ def map_figure(cube, ch_start, ch_end, zmin=None, zmax=None,
     if log:  # shortcut: log via data transform; zmin/zmax then apply to log1p values
         image = np.log1p(image)
     fig = px.imshow(image, color_continuous_scale=colorscale or "Viridis",
-                    aspect="auto", labels={"x": "x (col)", "y": "y (row)", "color": "sum"})
+                    aspect="equal", labels={"x": "x (col)", "y": "y (row)", "color": "sum"})
+    fig.update_layout(dragmode="select")
     if zmin is not None or zmax is not None:
         fig.update_coloraxes(cmin=float(zmin) if zmin is not None else None,
                              cmax=float(zmax) if zmax is not None else None)
@@ -272,7 +315,10 @@ def build_app(cube=None):
             dbc.Col(md=5, children=[
                 dbc.Col(html.H4("XRF Map", style={"color": _ACCENT}),
                         width={"size": 6, "offset": 3}),
-                dcc.Graph(id="map", style={"height": "60vh"}),
+                html.Div(dcc.Graph(id="map", responsive=True,
+                                   style={"height": "100%", "width": "100%"}),
+                         id="map-frame", style={"width": "100%",
+                                                 "aspectRatio": W / H if H else 1}),
                 dbc.Row(className="g-2 align-items-center mb-2", children=[
                     dbc.Col([dbc.Label("zmin", html_for="zmin"), dbc.Input(id="zmin", type="number")], width=2),
                     dbc.Col([dbc.Label("zmax", html_for="zmax"), dbc.Input(id="zmax", type="number")], width=2),
@@ -291,6 +337,8 @@ def build_app(cube=None):
                     dbc.Col([dbc.Label("ch end", html_for="ch-e"), dbc.Input(id="ch-e", type="number", value=C)], width=4),
                     dbc.Col(dbc.Button("Apply interval", id="apply-ch", n_clicks=0, outline=True, color="info"), width=4),
                 ]),
+                dbc.Button("Download current map", id="download-map", n_clicks=0,
+                           outline=True, color="info", className="w-100"),
             ]),
             ### spectrum column
             dbc.Col(md=7, children=[
@@ -341,6 +389,7 @@ def build_app(cube=None):
         dcc.Store(id="scale-store", data={"zmin": None, "zmax": None}),
         dcc.Store(id="cal-store", data=None),
         dcc.Store(id="gen", data=0),
+        dcc.Download(id="map-download"),
     ])
 
     @app.callback(Output("map", "figure"),
@@ -359,6 +408,39 @@ def build_app(cube=None):
         m, q = (calibration or {}).get("m"), (calibration or {}).get("q")
         return map_figure(c, s, e, scale.get("zmin"), scale.get("zmax"),
                           cscale, bool(log), m, q, roi, points)
+
+    @app.callback(Output("map-frame", "style"), Input("roi-store", "data"))
+    def _map_frame_style(roi):
+        c = state["cube"]
+        if c is None:
+            return {"width": "100%", "aspectRatio": 1}
+        H, W = c.shape[:2]
+        y0, y1, x0, x1 = _clamp_roi(H, W, *(roi or [0, H, 0, W]))
+        if y1 <= y0 or x1 <= x0:
+            y0, y1, x0, x1 = 0, H, 0, W
+        return {"width": "100%", "aspectRatio": (x1 - x0) / (y1 - y0)}
+
+    @app.callback(Output("map-download", "data"), Input("download-map", "n_clicks"),
+                  State("ch-store", "data"), State("roi-store", "data"),
+                  State("colorscale", "value"), State("log", "value"),
+                  State("scale-store", "data"), prevent_initial_call=True)
+    def _download_map(_n, channels, roi, colorscale, log, scale):
+        c = state["cube"]
+        if c is None:
+            return no_update
+        start, end = channels
+        image = map_from_channels(c, start, end)
+        if log:
+            image = np.log1p(image)
+        if roi:
+            y0, y1, x0, x1 = _clamp_roi(*image.shape, *roi)
+            image = image[y0:y1, x0:x1]
+        if image.size == 0:
+            return no_update
+        scale = scale or {}
+        png = _map_png_bytes(image, colorscale or "Viridis",
+                             scale.get("zmin"), scale.get("zmax"))
+        return dcc.send_bytes(png, "xrf_map.png")
 
     @app.callback(Output("spectrum", "figure"),
                   Input("roi-store", "data"), Input("points-store", "data"),
@@ -379,12 +461,13 @@ def build_app(cube=None):
                                channel_range=channels, log=bool(log))
 
     @app.callback(Output("roi-store", "data"),
-                  Input("map", "relayoutData"), Input("apply-roi", "n_clicks"),
+                  Input("map", "relayoutData"), Input("map", "selectedData"),
+                  Input("apply-roi", "n_clicks"),
                   State("roi-store", "data"),
                   State("roi-y0", "value"), State("roi-y1", "value"),
                   State("roi-x0", "value"), State("roi-x1", "value"),
                   prevent_initial_call=True)
-    def _set_roi(rl, n, cur, y0, y1, x0, x1):
+    def _set_roi(rl, selected, n, cur, y0, y1, x0, x1):
         c = state["cube"]
         if c is None:
             return cur
@@ -393,6 +476,9 @@ def build_app(cube=None):
             return _clamp_roi(H, W, y0, y1, x0, x1)
         if ctx.triggered_id == "map":
             r = _roi_from_relayout(rl, H, W)
+            if r is not None:
+                return r
+            r = _roi_from_selection(selected, H, W)
             if r is not None:
                 return r
         return cur

@@ -147,3 +147,14 @@ been performed as part of creating these templates. Do not invent entries.
 - **Docs:** synchronized current UI behavior and deployment status across README, operational plan, scientific notes, to-do, agent guidance, and deployment guides. Marked the original M0 prompts as archival; recorded the user's WSLC success report while keeping Docker/Apptainer untested.
 - **Notebook:** confirmed the installed Dash `run()` signature accepts `jupyter_height: int` (default 650 px). Use `jupyter_height=1000` to give the inline app more vertical space; the user will update `example.ipynb`.
 - **Verification:** documentation-only change; no code tests run. `example.ipynb` remains untouched by this task.
+
+### 2026-11-13 — M17: square, responsive map geometry (completed)
+
+- **Change:** map uses box-select for arbitrary rectangles; the responsive container aspect ratio follows the current ROI while Plotly preserves equal x/y scale, so pixels remain square without constraining ROI shape.
+- **Verification:** HTTP callback test confirms a non-square ROI selection and corresponding dynamic frame ratio; Plotly figure test confirms the equal-axis constraint. Browser rendering was not checked here.
+
+### 2026-11-13 — M18: exact-pixel current-map PNG export (completed)
+
+- **Behavior:** Download current map exports the active channel sum and visible spatial crop to RGBA PNG, one output pixel per map matrix value, applying current colorscale, z-limits and log transform. Axes, colorbar and point overlays are omitted; PNG rows are emitted without resampling.
+- **Implementation:** standard-library PNG chunks/zlib plus Plotly's installed colorscale sampler; no new dependency.
+- **Verification:** `uv run pytest -q` → 60 passed, 1 skipped (GPU); UI callback test checks filename, PNG signature, exact crop dimensions, active colorscale pixel values, and unfiltered one-pixel-per-value scanlines.

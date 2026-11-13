@@ -29,4 +29,5 @@ docker short-flag form. `-v` takes a Windows source path; drop `:ro` if
 your wslc version rejects it.)
 
 Then open http://localhost:8765. The user reports that the WSLC deployment and
-UI work correctly. Docker/Apptainer runtime recipes have not been tested.
+UI work correctly. It supports arbitrary rectangular map selections and
+exact-pixel PNG downloads. Docker/Apptainer runtime recipes have not been tested.

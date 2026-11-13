@@ -3,23 +3,28 @@ import base64
 import http.server
 import json
 import socketserver
+import struct
 import threading
+import zlib
 from functools import partial
 from pathlib import Path
 
 import numpy as np
 import pytest
 from dash import Dash
+from plotly.colors import sample_colorscale
 
 from xrf_visualizer.ui.app import (
     _ch_from_relayout,
     _clamp_roi,
     _parse_points,
     _roi_from_relayout,
+    _roi_from_selection,
     build_app,
     map_figure,
     spectrum_figure,
 )
+from xrf_visualizer.processing import map_from_channels
 
 FIX = Path(__file__).parent / "fixtures"
 NPZ = FIX / "synthetic_cube.npz"
@@ -80,6 +85,7 @@ def test_map_figure_matches_golden(cube, golden):
     assert np.asarray(fig2.data[0]["z"]).shape == (H, W)
     assert "100–120 ADC channels" in fig.layout.title.text
     assert "7.96–9.452 keV" in map_figure(cube, 100, 120, m=0.0746, q=0.5).layout.title.text
+    assert fig.layout.xaxis.scaleanchor == "y"
 
 
 def test_spectrum_figure_matches_golden(cube, golden):
@@ -110,6 +116,26 @@ def test_roi_from_relayout():
     assert _roi_from_relayout({"xautorange": True, "yautorange": True}, H, W) == [0, H, 0, W]
     assert _roi_from_relayout({"xaxis.range[0]": 10.2, "xaxis.range[1]": 39.8,
                                "yaxis.range[0]": 19.5, "yaxis.range[1]": 9.4}, H, W) == [9, 20, 10, 40]
+
+
+def test_roi_from_rectangular_selection():
+    selection = {"range": {"x": [10.2, 20.8], "y": [4.1, 9.7]}}
+    assert _roi_from_selection(selection, H, W) == [4, 10, 10, 21]
+    assert _roi_from_selection(None, H, W) is None
+
+
+def test_rectangular_graph_selection_updates_roi_and_aspect(cube):
+    app = build_app(cube)
+    roi = _http_callback(app, "roi-store.data",
+        {"map.relayoutData": None,
+         "map.selectedData": {"range": {"x": [10.2, 20.8], "y": [4.1, 9.7]}},
+         "apply-roi.n_clicks": 0},
+        {"roi-store.data": [0, H, 0, W], "roi-y0.value": 0, "roi-y1.value": H,
+         "roi-x0.value": 0, "roi-x1.value": W}, "map.selectedData")
+    assert roi == [4, 10, 10, 21]
+    frame = _http_callback(app, "map-frame.style", {"roi-store.data": roi}, {},
+                           "roi-store.data")
+    assert frame == {"width": "100%", "aspectRatio": 11 / 6}
 
 
 def test_ch_from_relayout():
@@ -303,6 +329,35 @@ def test_xrf_line_select_applies_calibrated_energy_width(cube):
                           "line-select.value") == "Selected: Al (Ka) — 1.486 keV"
 
 
+def test_download_current_map_is_cropped_pixel_exact_png(cube):
+    app = build_app(cube)
+    data = _http_callback(app, "map-download.data", {"download-map.n_clicks": 1},
+        {"ch-store.data": [100, 110], "roi-store.data": [10, 12, 20, 23],
+         "colorscale.value": "Hot", "log.value": [],
+         "scale-store.data": {"zmin": None, "zmax": None}}, "download-map.n_clicks")
+    png = base64.b64decode(data["content"])
+    assert data["filename"] == "xrf_map.png"
+    assert png[:8] == b"\x89PNG\r\n\x1a\n"
+    width, height, depth, color_type = struct.unpack(">IIBB", png[16:26])
+    assert (width, height, depth, color_type) == (3, 2, 8, 6)
+    pos, compressed = 8, b""
+    while pos < len(png):
+        size = struct.unpack(">I", png[pos:pos + 4])[0]
+        kind = png[pos + 4:pos + 8]
+        chunk = png[pos + 8:pos + 8 + size]
+        if kind == b"IDAT":
+            compressed += chunk
+        pos += 12 + size
+    raw = zlib.decompress(compressed)
+    assert len(raw) == height * (1 + width * 4)
+    assert all(raw[row * (1 + width * 4)] == 0 for row in range(height))
+    current = map_from_channels(cube, 100, 110)[10:12, 20:23]
+    value = (current[0, 0] - current.min()) / (current.max() - current.min())
+    expected = np.rint(np.asarray(sample_colorscale(
+        "Hot", [value], colortype="tuple")[0]) * 255).astype(np.uint8)
+    assert np.array_equal(np.frombuffer(raw[1:5], dtype=np.uint8), [*expected, 255])
+
+
 def test_clear_selection_resets_both_plots(cube):
     app = build_app(cube)
     key = next(k for k in app.callback_map if "points-store.data" in k)
@@ -387,7 +442,8 @@ def test_build_app_empty():
                      "upload", "url", "load-url", "change-file", "load-msg",
                      "apply-calibration", "apply-scale",
                      "reset-scale", "cal-msg", "line-select", "line-width",
-                     "apply-line", "line-selected", "scale-store", "cal-store", "cube-name", "gen"):
+                     "apply-line", "line-selected", "scale-store", "cal-store",
+                     "download-map", "map-frame", "cube-name", "gen"):
         assert expected in ids
     # figures render the empty state without a cube (raw figure, dash 4.5 single-Output)
     f = _cb(app, "map.figure")([0, 0], [0, 0, 0, 0], [], "Viridis", [],

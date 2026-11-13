@@ -12,7 +12,7 @@ GPU variant is in `uv/README.md` and remains NOT TESTED.
    .venv/bin/python -m pytest -q
    ```
 
-   Latest recorded result: `57 passed, 1 skipped` (GPU parity, not tested).
+   Latest recorded result: `60 passed, 1 skipped` (GPU parity, not tested).
 
 2. Register the Jupyter kernel (once):
 
