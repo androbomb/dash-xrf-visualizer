@@ -84,10 +84,12 @@ Requires [uv](https://docs.astral.sh/uv/); Python 3.12 is managed by uv via
 `.python-version`. In Jupyter/JupyterLab select the kernel
 **Python 3.12 (xrf-viz)**.
 
-The project is not published to PyPI yet. The planned pip distribution name is
+The project is not published to PyPI yet. The distribution name is
 `xrf-visualizer`; see [`deploy/how_to_deploy_pip.md`](deploy/how_to_deploy_pip.md)
-for the end-user install instructions and maintainer release checklist. `uv`
-remains available as the lockfile-based development/Jupyter workflow.
+for end-user installation and the maintainer release checklist. GitHub Actions
+tests Python 3.12/3.13 and builds distributions; publishing is a separate,
+manual workflow using PyPI Trusted Publishing. `uv` remains available as the
+lockfile-based development/Jupyter workflow.
 The project license is MIT; see [`LICENSE`](LICENSE).
 
 Dash's inline notebook frame defaults to 650 px tall. Increase it to avoid an

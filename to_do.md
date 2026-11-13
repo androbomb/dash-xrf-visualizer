@@ -44,12 +44,13 @@
 - [x] M25 — User confirmed calibration, log scale, and map reset work in the notebook. Latest full suite: 61 passed, 1 skipped (GPU).
 - [x] M26 — Full-field multi-line map/spectrum gallery, calibration gate, per-line widths, shared/default or per-line autoscale, range titles, and PNG/SVG/JSON ZIP export. Tests: 63 passed, 1 skipped (GPU).
 
-## Later — not executable in Hermes' current environment
+## Later — remaining release/maintenance work
 
 - [ ] PyPI release: recheck `xrf-visualizer` availability, confirm license
-  copyright holder, complete metadata, test wheel/install on supported Python
-  versions, then configure GitHub Trusted Publishing. Guide:
-  `deploy/how_to_deploy_pip.md`.
+  copyright holder, run the new CI on GitHub, rehearse the artifact on
+  TestPyPI, configure GitHub Trusted Publishing (`androbomb` /
+  `dash-xrf-visualizer` / `publish.yml` / `pypi`), then manually publish a
+  reviewed version tag. Guide: `deploy/how_to_deploy_pip.md`.
 
 - [ ] Drag-mode select on the map (deferred by user 2026-11-11): plotly drag-mode selection in addition to zoom = selection; zoom + numeric ROI panel cover the need for now.
 - [ ] Ask user to manually test Docker and Apptainer; WSLC was reported working by the user. Document results without claiming unverified container tests.
