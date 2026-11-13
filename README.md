@@ -67,7 +67,7 @@ parts were removed by decision; the custom CHNet raw reader is deferred.
 
 ```bash
 uv sync
-.venv/bin/python -m pytest -q             # latest: 60 passed + 1 GPU skip
+.venv/bin/python -m pytest -q             # latest: 61 passed + 1 GPU skip
 .venv/bin/python -m ipykernel install --user --name xrf-viz \
     --display-name "Python 3.12 (xrf-viz)"
 ```
@@ -162,8 +162,11 @@ host, 2026-11-10). GPU is an opt-in, NOT TESTED variant —
   crop as a lossless PNG with one square image pixel per matrix element. The
   chosen colorscale, zmin/zmax and log transform are applied; axes/colorbar and
   point markers are not included.
-- M20: map double-click resets the ROI in notebook and browser; calibration
-  inputs accept arbitrary decimal precision.
+- M21–M23: map double-click reset has Plotly and DOM/store paths; Apply
+  calibration captures both live field values.
+- M24: calibration uses plain text inputs (comma or point decimal); log mode
+  transforms map data and raw-count zmin/zmax together, including PNG export.
+- M25: user confirmed calibration, log scale and map reset work in the notebook.
 - `example.ipynb`: set `path_to_file`, then `build_app(cube)` and
   `app.run(jupyter_mode="inline", jupyter_height=1000)` (Dash 4.x); the height
   is in pixels. `app.run()` also works from a terminal.

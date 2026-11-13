@@ -169,10 +169,10 @@ been performed as part of creating these templates. Do not invent entries.
 - **First attempt:** captured Plotly's `plotly_doubleclick` event and set m/q numeric inputs to `step="any"`.
 - **Result:** user reported both issues persisted in the deployed UI; the HTTP tests had not exercised a real browser.
 
-### 2026-11-13 — M21: browser-independent map reset and decimal calibration input (implemented)
+### 2026-11-13 — M21: first browser-independent reset attempt (superseded)
 
-- **Fix:** bind a native DOM double-click listener to the stable Dash map root and route it through the ROI reset store; disable Plotly's competing double-click action. Use decimal text inputs for m/q to avoid browser numeric-step validation while retaining server-side finite-value checks and float precision.
-- **Verification:** UI test confirms the clientside listener is registered and m=0.0751 reaches the calibration store; `uv run pytest -q` → 61 passed, 1 skipped (GPU). Browser/Jupyter runtime remains unverified because no browser is installed here.
+- **First attempt:** bind a native DOM double-click listener to the Dash map root and disable Plotly's native reset; use text inputs with server-side float validation.
+- **Result:** user reported the interaction still failed; M23 restored Plotly reset as a fallback. Browser/Jupyter runtime was not available for direct verification.
 
 ### 2026-11-13 — M22: log color limits and stale-kernel diagnosis
 
@@ -189,3 +189,7 @@ been performed as part of creating these templates. Do not invent entries.
 
 - **Docs check:** official Dash/dbc docs show input `value` accepts strings or numbers; the invalid-value-to-`None` behavior applies to numeric inputs, and `inputMode` is only a browser hint. Replaced m/q with Dash Core `dcc.Input(type="text")`; parser accepts both decimal commas and points.
 - **Fix / verification:** regression covers m=0,075, q=0,1199 and applying log while raw-count zmax=2000 is committed; HTTP figure and exact-pixel PNG export use color limits transformed with `log1p`. Full suite: `uv run pytest -q` → 61 passed, 1 skipped (GPU).
+
+### 2026-11-13 — M25: user confirms notebook interactions (completed)
+
+- **Evidence:** user reports calibration, log scale, and map interactions now all work in the notebook after rebuilding the app. This is user-side visual confirmation; no browser run was available in this environment.

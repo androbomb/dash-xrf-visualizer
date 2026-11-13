@@ -1,7 +1,7 @@
 # XRF-only visualizer — project to-do
 
 > Future requirements are user decisions, not verified legacy implementation.
-> M0–M18 completed 2026-11-10/13 (evidence in `timeline.md`).
+> M0–M25 completed 2026-11-10/13 (evidence in `timeline.md`).
 
 ## Now — M1 baseline + approved docs (completed 2026-11-10)
 
@@ -36,6 +36,12 @@
 - [x] M15 — Convert calibrated spectrum selections from keV back to ADC channels; gate line Apply on calibration and show the selected line.
 - [x] M17 — Keep map pixels square while enabling arbitrary rectangle selection; size the responsive map frame to the current ROI.
 - [x] M18 — Download the current map/visible ROI as a no-axes, no-colorbar, exact-pixel PNG using the active display colorscale and limits.
+
+## Done — M19–M25: interaction fixes and final notebook confirmation
+
+- [x] M19–M23 — Restore map double-click reset paths; ensure Apply calibration captures both current m/q values.
+- [x] M24 — Use plain text calibration inputs (comma or point decimals); transform map scale limits consistently in log mode, including PNG export.
+- [x] M25 — User confirmed calibration, log scale, and map reset work in the notebook. Latest full suite: 61 passed, 1 skipped (GPU).
 
 ## Later — not executable in Hermes' current environment
 
