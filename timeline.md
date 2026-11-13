@@ -158,3 +158,8 @@ been performed as part of creating these templates. Do not invent entries.
 - **Behavior:** Download current map exports the active channel sum and visible spatial crop to RGBA PNG, one output pixel per map matrix value, applying current colorscale, z-limits and log transform. Axes, colorbar and point overlays are omitted; PNG rows are emitted without resampling.
 - **Implementation:** standard-library PNG chunks/zlib plus Plotly's installed colorscale sampler; no new dependency.
 - **Verification:** `uv run pytest -q` → 60 passed, 1 skipped (GPU); UI callback test checks filename, PNG signature, exact crop dimensions, active colorscale pixel values, and unfiltered one-pixel-per-value scanlines.
+
+### 2026-11-13 — M19: restore map double-click reset (completed)
+
+- **Fix:** explicitly configure Plotly's map double-click action as `reset`; the ROI callback consumes autorange relayouts before any stale box-selection data.
+- **Verification:** UI HTTP regression test confirms an autorange event restores full map bounds even if the prior rectangle selection is still present.

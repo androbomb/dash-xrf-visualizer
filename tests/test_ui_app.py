@@ -136,6 +136,13 @@ def test_rectangular_graph_selection_updates_roi_and_aspect(cube):
     frame = _http_callback(app, "map-frame.style", {"roi-store.data": roi}, {},
                            "roi-store.data")
     assert frame == {"width": "100%", "aspectRatio": 11 / 6}
+    reset = _http_callback(app, "roi-store.data",
+        {"map.relayoutData": {"xaxis.autorange": True, "yaxis.autorange": True},
+         "map.selectedData": {"range": {"x": [10.2, 20.8], "y": [4.1, 9.7]}},
+         "apply-roi.n_clicks": 0},
+        {"roi-store.data": roi, "roi-y0.value": 4, "roi-y1.value": 10,
+         "roi-x0.value": 10, "roi-x1.value": 21}, "map.relayoutData")
+    assert reset == [0, H, 0, W]
 
 
 def test_ch_from_relayout():

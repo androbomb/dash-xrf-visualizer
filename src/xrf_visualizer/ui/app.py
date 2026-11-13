@@ -316,6 +316,7 @@ def build_app(cube=None):
                 dbc.Col(html.H4("XRF Map", style={"color": _ACCENT}),
                         width={"size": 6, "offset": 3}),
                 html.Div(dcc.Graph(id="map", responsive=True,
+                                   config={"doubleClick": "reset"},
                                    style={"height": "100%", "width": "100%"}),
                          id="map-frame", style={"width": "100%",
                                                  "aspectRatio": W / H if H else 1}),
@@ -475,12 +476,14 @@ def build_app(cube=None):
         if "apply-roi.n_clicks" in ctx.triggered_prop_ids:
             return _clamp_roi(H, W, y0, y1, x0, x1)
         if ctx.triggered_id == "map":
-            r = _roi_from_relayout(rl, H, W)
-            if r is not None:
-                return r
-            r = _roi_from_selection(selected, H, W)
-            if r is not None:
-                return r
+            if "map.relayoutData" in ctx.triggered_prop_ids:
+                r = _roi_from_relayout(rl, H, W)
+                if r is not None:
+                    return r
+            if "map.selectedData" in ctx.triggered_prop_ids:
+                r = _roi_from_selection(selected, H, W)
+                if r is not None:
+                    return r
         return cur
 
     @app.callback(Output("ch-store", "data"),
