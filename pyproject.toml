@@ -1,8 +1,9 @@
 [project]
-name = "xrf-visualizer"
+name = "chnet-xrf-visualizer"
 version = "0.1.0"
 description = "Plotly Dash visualizer for XRF cubes (HDF5/.npz/.npy): 2-D map + spectrum with spectral-interval and ROI selection."
 readme = "README.md"
+license = "MIT"
 requires-python = ">=3.12,<3.14"
 dependencies = [
     # I/O

@@ -46,9 +46,10 @@
 
 ## Later — not executable in Hermes' current environment
 
-- [ ] PyPI release: confirm `chnet-xrf-visualizer` availability and license,
-  update project metadata, test wheel/install on supported Python versions,
-  then configure GitHub Trusted Publishing. Guide: `deploy/how_to_deploy_pip.md`.
+- [ ] PyPI release: recheck `chnet-xrf-visualizer` availability, confirm license
+  copyright holder, complete metadata, test wheel/install on supported Python
+  versions, then configure GitHub Trusted Publishing. Guide:
+  `deploy/how_to_deploy_pip.md`.
 
 - [ ] Drag-mode select on the map (deferred by user 2026-11-11): plotly drag-mode selection in addition to zoom = selection; zoom + numeric ROI panel cover the need for now.
 - [ ] Ask user to manually test Docker and Apptainer; WSLC was reported working by the user. Document results without claiming unverified container tests.

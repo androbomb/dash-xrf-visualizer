@@ -30,18 +30,17 @@ variant.
 
 ## Before the first release
 
-1. Confirm the normalized PyPI project name `chnet-xrf-visualizer` is available
-   and controlled by the intended maintainer account. The source import remains
-   `xrf_visualizer`; a PyPI distribution name does not require renaming the
-   `src/xrf_visualizer/` directory.
-2. Choose a license and add both its full `LICENSE` text and matching
-   `pyproject.toml` metadata. Current recommendation: MIT for a simple,
-   permissive open-source release; consider Apache-2.0 if an explicit patent
-   grant is important. Do not publish until the copyright holder/organization
-   has approved the choice. No license file or metadata is present currently.
-3. Complete package metadata (`authors`, project URLs, Python classifiers,
-   license) and change `[project].name` from `xrf-visualizer` to the confirmed
-   distribution name. Keep `requires-python = ">=3.12,<3.14"` unless CI and
+1. The PyPI JSON endpoint returned HTTP 404 for `chnet-xrf-visualizer` on
+   2026-11-13, so no project was listed then. This does not reserve the name;
+   recheck immediately before publishing. The distribution name is now set in
+   `pyproject.toml`; the source import remains `xrf_visualizer`, so the source
+   directory does not need renaming.
+2. MIT is now recorded in `LICENSE` and `pyproject.toml`. Before the first
+   release, verify the copyright notice matches the actual rights holder and
+   review licenses of any material added to the package. Apache-2.0 is an
+   alternative if an explicit patent grant is important.
+3. Complete remaining package metadata (`authors`, project URLs, Python
+   classifiers). Keep `requires-python = ">=3.12,<3.14"` unless CI and
    dependencies are verified for another range.
 4. Build wheel and source distribution using the existing Hatchling backend;
    inspect both archives to confirm `xrf_visualizer/data/XRFlines.json` ships

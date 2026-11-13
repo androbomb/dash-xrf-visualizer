@@ -88,6 +88,7 @@ The project is not published to PyPI yet. The planned pip distribution name is
 `chnet-xrf-visualizer`; see [`deploy/how_to_deploy_pip.md`](deploy/how_to_deploy_pip.md)
 for the end-user install instructions and maintainer release checklist. `uv`
 remains available as the lockfile-based development/Jupyter workflow.
+The project license is MIT; see [`LICENSE`](LICENSE).
 
 Dash's inline notebook frame defaults to 650 px tall. Increase it to avoid an
 inner vertical scrollbar when the UI needs more space, for example:
