@@ -62,12 +62,16 @@ parts were removed by decision; the custom CHNet raw reader is deferred.
   the selected interval and visible spatial ROI as one exact-size PNG pixel
   per XRF pixel, with the chosen colorscale/limits/log transform and no axes
   or colorbar.
+- M26 (multi-line elemental maps) completed 2026-11-13: calibrated full-field
+  maps with per-line integration widths, shared/default or per-line autoscale,
+  an associated full-field spectrum, and ZIP export (map PNGs, vector spectrum
+  SVGs, and `metadata.json`).
 
 ## Setup
 
 ```bash
 uv sync
-.venv/bin/python -m pytest -q             # latest: 61 passed + 1 GPU skip
+.venv/bin/python -m pytest -q             # latest: 63 passed + 1 GPU skip
 .venv/bin/python -m ipykernel install --user --name xrf-viz \
     --display-name "Python 3.12 (xrf-viz)"
 ```
@@ -167,6 +171,17 @@ host, 2026-11-10). GPU is an opt-in, NOT TESTED variant —
 - M24: calibration uses plain text inputs (comma or point decimal); log mode
   transforms map data and raw-count zmin/zmax together, including PNG export.
 - M25: user confirmed calibration, log scale and map reset work in the notebook.
+- M26: below the existing UI, add unique XRF catalog lines and set each
+  integration width in keV. Apply calibration before adding or computing.
+  Compute integrates each line over the **full field**, regardless of current
+  ROI/points/spectrum selection, then shows map and full-field spectrum side by
+  side. The spectrum highlights the requested energy window and reference line
+  center. “Same scale for all” is on by default; turn it off for per-line
+  autoscale. Titles include line, width, count range, and display-scale range.
+  Download all writes exact-size full-field map PNGs, matching vector
+  `*_spectra.svg` plots, and `metadata.json` (calibration, channel/energy
+  integration bounds, scale/color settings, map extrema, and observed
+  count-weighted spectrum centroid) in one ZIP.
 - `example.ipynb`: set `path_to_file`, then `build_app(cube)` and
   `app.run(jupyter_mode="inline", jupyter_height=1000)` (Dash 4.x); the height
   is in pixels. `app.run()` also works from a terminal.

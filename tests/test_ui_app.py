@@ -7,7 +7,9 @@ import struct
 import threading
 import zlib
 from functools import partial
+from io import BytesIO
 from pathlib import Path
+from zipfile import ZipFile
 
 import numpy as np
 import pytest
@@ -15,8 +17,11 @@ from dash import Dash
 from plotly.colors import sample_colorscale
 
 from xrf_visualizer.ui.app import (
+    _add_elemental_line,
     _ch_from_relayout,
     _clamp_roi,
+    _line_channel_range,
+    _map_png_bytes,
     _parse_points,
     _roi_from_relayout,
     _roi_from_selection,
@@ -369,6 +374,85 @@ def test_xrf_line_select_applies_calibrated_energy_width(cube):
                         if "line-selected.children" in k)
     assert _http_callback(app, selected_key, {"line-select.value": 1.486}, {},
                           "line-select.value") == "Selected: Al (Ka) — 1.486 keV"
+
+
+def test_elemental_gallery_full_field_scale_and_zip(cube):
+    app = build_app(cube)
+    # Use two catalog entries whose calibrated windows fit the synthetic cube.
+    from xrf_visualizer.ui.app import _XRF_LINES
+    rows = [{"line_id": i, "width": 0.2} for i, line in enumerate(_XRF_LINES)
+            if line["element"].startswith(("Al (Ka)", "Si (Ka)"))][:2]
+    assert len(rows) == 2
+    widths = [row["width"] for row in rows]
+    calibration = {"m": 0.01, "q": 0.0}
+    compute = next(spec["callback"].__wrapped__ for spec in app.callback_map.values()
+                   if any(item["id"] == "elemental-compute" for item in spec["inputs"]))
+    metadata, message, index = compute(1, rows, widths, calibration)
+    assert len(metadata) == 2 and index == 0 and "2 full-field" in message
+
+    figure = next(spec["callback"].__wrapped__ for spec in app.callback_map.values()
+                  if any(item.component_id == "elemental-map"
+                         for item in (spec["output"] if isinstance(spec["output"], list)
+                                      else [spec["output"]])))
+    shared = figure(metadata, 0, ["shared"], "Hot", [])
+    assert shared.layout.title.text.startswith("Al (Ka)")
+    assert "range" in shared.layout.title.text and "scale" in shared.layout.title.text
+    assert shared.layout.coloraxis.cmin == pytest.approx(min(m["minimum"] for m in metadata))
+    assert shared.layout.coloraxis.cmax == pytest.approx(max(m["maximum"] for m in metadata))
+    np.testing.assert_array_equal(_plotly_array(shared.data[0].z),
+                                  map_from_channels(cube, 139, 159))
+    assert shared.layout.xaxis.scaleanchor == "y"
+    auto = figure(metadata, 0, [], "Hot", ["log"])
+    assert auto.layout.coloraxis.cmin == pytest.approx(np.log1p(metadata[0]["minimum"]))
+    assert auto.layout.coloraxis.cmax == pytest.approx(np.log1p(metadata[0]["maximum"]))
+
+    spectrum_figure_callback = next(spec["callback"].__wrapped__
+                                    for spec in app.callback_map.values()
+                                    if any(item.component_id == "elemental-spectrum"
+                                           for item in (spec["output"] if isinstance(spec["output"], list)
+                                                        else [spec["output"]])))
+    spectrum_fig = spectrum_figure_callback(metadata, 0, calibration, [])
+    assert spectrum_fig.layout.title.text.startswith("Full-field spectrum — Al (Ka)")
+    assert spectrum_fig.layout.xaxis.title.text == "Energy (keV)"
+    assert spectrum_fig.layout.shapes[0].type == "rect"
+
+    download = next(spec["callback"].__wrapped__ for spec in app.callback_map.values()
+                    if any(item["id"] == "elemental-download" for item in spec["inputs"]))
+    data, status = download(1, metadata, ["shared"], "Hot", [], calibration)
+    assert status == "Downloaded 2 maps and spectra"
+    with ZipFile(BytesIO(base64.b64decode(data["content"]))) as archive:
+        assert len(archive.namelist()) == 5
+        map_files = [name for name in archive.namelist() if name.endswith(".png")]
+        spectrum_files = [name for name in archive.namelist() if name.endswith("_spectra.svg")]
+        assert len(map_files) == len(spectrum_files) == 2
+        for filename in map_files:
+            png = archive.read(filename)
+            width, height = struct.unpack(">II", png[16:24])
+            assert (width, height) == (W, H)
+        expected_png = _map_png_bytes(map_from_channels(cube, 139, 159), "Hot",
+                                      min(m["minimum"] for m in metadata),
+                                      max(m["maximum"] for m in metadata))
+        assert expected_png in [archive.read(name) for name in map_files]
+        assert all(b"Energy (keV)" in archive.read(name) for name in spectrum_files)
+        manifest = json.loads(archive.read("metadata.json"))
+        assert len(manifest) == 2
+        assert manifest[0]["file"] in map_files
+        assert manifest[0]["spectrum_file"] in spectrum_files
+        assert manifest[0]["min_count"] == pytest.approx(min(m["minimum"] for m in metadata))
+        assert manifest[0]["line_centre_keV"] == pytest.approx(1.486)
+        assert manifest[0]["integration_zone_keV"] == pytest.approx([1.386, 1.586])
+
+
+def test_elemental_map_requires_calibration_and_width_is_float():
+    row = {"line_id": 3, "width": 0.15}
+    assert _add_elemental_line([row], 3) == [row]
+    assert _line_channel_range(1.5, "0,075", {"m": 0.01, "q": 0}, 512) == (147, 154)
+    with pytest.raises(ValueError, match="positive"):
+        _line_channel_range(1.5, 0, {"m": 0.01, "q": 0}, 512)
+    app = build_app(np.zeros((2, 3, 4), dtype=np.float32))
+    buttons = _cb(app, "elemental-add.disabled")
+    assert buttons(None, 0, [], [])[:2] == (True, True)
+    assert buttons({"m": 1, "q": 0}, 0, [{"line_id": 1}], [])[:2] == (False, False)
 
 
 def test_calibration_inputs_accept_full_float_precision(cube):

@@ -25,10 +25,14 @@ dash-bootstrap-components DARKLY theme, #4196B4 navbar, fluid container,
 5/7 columns, outline info buttons.
 """
 import base64
+import json
 import math
 import re
 import struct
+import zipfile
 import zlib
+from io import BytesIO
+from html import escape as html_escape
 from pathlib import Path
 
 import dash_bootstrap_components as dbc
@@ -36,7 +40,7 @@ import numpy as np
 import plotly.express as px
 import plotly.graph_objects as go
 from plotly.colors import sample_colorscale
-from dash import Dash, Input, Output, State, ctx, dcc, html, no_update
+from dash import ALL, Dash, Input, Output, State, ctx, dcc, html, no_update
 
 from ..data import download_cube, load_cube_bytes, load_xrf_lines
 from ..processing import (
@@ -168,6 +172,97 @@ def _parse_points(rows_s, cols_s):
     if len(rows) != len(cols):
         raise ValueError(f"rows ({len(rows)}) and cols ({len(cols)}) must match")
     return list(zip(rows, cols))
+
+
+def _line_channel_range(line_energy, width, calibration, channels):
+    """Return the half-open ADC channel interval for a centered keV window."""
+    m, q = float(calibration["m"]), float(calibration["q"])
+    line_energy = float(line_energy)
+    width = float(str(width).strip().replace(",", "."))
+    if not all(math.isfinite(v) for v in (m, q, line_energy, width)) or m <= 0 or width <= 0:
+        raise ValueError("Calibration must be valid and width must be positive")
+    start = max(0, math.ceil((line_energy - width / 2 - q) / m))
+    end = min(channels, math.floor((line_energy + width / 2 - q) / m) + 1)
+    if start >= end:
+        raise ValueError("Selected line and width do not overlap cube channels")
+    return start, end
+
+
+def _add_elemental_line(rows, line_id):
+    if line_id in {row["line_id"] for row in rows}:
+        return rows
+    return [*rows, {"line_id": line_id, "width": 0.1}]
+
+
+def _elemental_map_figure(image, title, zmin, zmax, colorscale, log):
+    shown = np.log1p(image) if log else image
+    fig = px.imshow(shown, color_continuous_scale=colorscale or "Viridis", aspect="equal",
+                    labels={"x": "x (col)", "y": "y (row)", "color": "sum"})
+    if log:
+        zmin, zmax = np.log1p(max(0.0, zmin)), np.log1p(max(0.0, zmax))
+    if zmin == zmax:
+        zmax = zmin + 1.0
+    fig.update_coloraxes(cmin=zmin, cmax=zmax)
+    fig.update_layout(title=title, margin=dict(l=40, r=10, t=55, b=30))
+    return fig
+
+
+def _elemental_spectrum_figure(spectrum, calibration, item, log=False):
+    energy = calibrate(len(spectrum), calibration["m"], calibration["q"])
+    y = np.log1p(spectrum) if log else spectrum
+    fig = go.Figure(go.Scatter(x=energy, y=y, mode="lines", name="Full-field sum"))
+    low, high = item["integration_zone_keV"]
+    fig.add_vrect(x0=low, x1=high, fillcolor="#f39c12", opacity=0.2, line_width=0,
+                  annotation_text="Integration zone", annotation_position="top left")
+    fig.add_vline(x=item["line_centre_keV"], line_dash="dash", line_color="#e67e22",
+                  annotation_text=f"{item['line_name']} center")
+    fig.update_layout(title=f"Full-field spectrum — {item['line_name']} ({item['integration_width_keV']:g} keV)",
+                      xaxis_title="Energy (keV)",
+                      yaxis_title="log1p(sum counts)" if log else "sum counts",
+                      margin=dict(l=55, r=15, t=55, b=40))
+    return fig
+
+
+def _spectrum_svg_bytes(spectrum, calibration, item, log=False):
+    """Write a labeled, vector spectrum plot without requiring a raster backend."""
+    energies = calibrate(len(spectrum), calibration["m"], calibration["q"])
+    values = np.log1p(spectrum) if log else np.asarray(spectrum, dtype=np.float64)
+    width, height = 1200, 720
+    left, right, top, bottom = 95, 30, 90, 80
+    x_min, x_max = float(energies[0]), float(energies[-1])
+    if x_max == x_min:
+        x_max = x_min + 1
+    finite = values[np.isfinite(values)]
+    y_max = float(finite.max()) if finite.size else 1.0
+    y_max = y_max if y_max > 0 else 1.0
+    x = lambda value: left + (value - x_min) / (x_max - x_min) * (width - left - right)
+    y = lambda value: height - bottom - value / y_max * (height - top - bottom)
+    points = " ".join(f"{x(float(e)):.2f},{y(float(v)):.2f}"
+                       for e, v in zip(energies, values)
+                       if np.isfinite(e) and np.isfinite(v))
+    title = html_escape(f"Full-field spectrum — {item['line_name']} ({item['integration_width_keV']:g} keV)")
+    zone_low, zone_high = item["integration_zone_keV"]
+    zone_left, zone_right = max(x_min, zone_low), min(x_max, zone_high)
+    lines = [f'<svg xmlns="http://www.w3.org/2000/svg" width="{width}" height="{height}" viewBox="0 0 {width} {height}">',
+             '<rect width="100%" height="100%" fill="white"/>',
+             f'<text x="{left}" y="42" font-family="sans-serif" font-size="25">{title}</text>']
+    for i in range(6):
+        fraction = i / 5
+        py, tick = y(y_max * fraction), y_max * fraction
+        px, xtick = left + (width - left - right) * fraction, x_min + (x_max - x_min) * fraction
+        lines.extend((f'<line x1="{left}" y1="{py:.2f}" x2="{width-right}" y2="{py:.2f}" stroke="#dddddd"/>',
+                      f'<text x="{left-12}" y="{py+5:.2f}" text-anchor="end" font-family="sans-serif" font-size="15">{tick:.4g}</text>',
+                      f'<line x1="{px:.2f}" y1="{top}" x2="{px:.2f}" y2="{height-bottom}" stroke="#eeeeee"/>',
+                      f'<text x="{px:.2f}" y="{height-bottom+27}" text-anchor="middle" font-family="sans-serif" font-size="15">{xtick:.4g}</text>'))
+    lines.extend((f'<rect x="{x(zone_left):.2f}" y="{top}" width="{max(0, x(zone_right)-x(zone_left)):.2f}" height="{height-top-bottom}" fill="#f39c12" opacity="0.2"/>',
+                  f'<line x1="{x(item["line_centre_keV"]):.2f}" y1="{top}" x2="{x(item["line_centre_keV"]):.2f}" y2="{height-bottom}" stroke="#e67e22" stroke-dasharray="8 6" stroke-width="2"/>',
+                  f'<polyline points="{points}" fill="none" stroke="#5968e8" stroke-width="2"/>',
+                  f'<line x1="{left}" y1="{top}" x2="{left}" y2="{height-bottom}" stroke="#222"/>',
+                  f'<line x1="{left}" y1="{height-bottom}" x2="{width-right}" y2="{height-bottom}" stroke="#222"/>',
+                  f'<text x="{(left+width-right)/2}" y="{height-18}" text-anchor="middle" font-family="sans-serif" font-size="18">Energy (keV)</text>',
+                  f'<text x="24" y="{height/2}" text-anchor="middle" transform="rotate(-90 24 {height/2})" font-family="sans-serif" font-size="18">{"log1p(sum counts)" if log else "sum counts"}</text>',
+                  '</svg>'))
+    return "\n".join(lines).encode("utf-8")
 
 
 # ------------------------------------------------------------ figure builders
@@ -391,15 +486,50 @@ def build_app(cube=None):
                 ]),
             ]),
         ]),
+        html.Hr(),
+        html.H4("Elemental maps (full field)", style={"color": _ACCENT}),
+        dbc.Row(className="g-2 align-items-end mb-2", children=[
+            dbc.Col([dbc.Label("Add XRF line"), dcc.Dropdown(
+                id="elemental-add-line", options=[
+                    {"label": f"{line['element']} ({line['value']:g} keV)", "value": i}
+                    for i, line in enumerate(_XRF_LINES)],
+                placeholder="Search XRF line…", searchable=True, clearable=True)], width=5),
+            dbc.Col(dbc.Button("Add line", id="elemental-add", n_clicks=0,
+                               outline=True, color="info", disabled=True), width=2),
+            dbc.Col(dcc.Checklist(id="elemental-shared-scale", options=[
+                {"label": "Same scale for all", "value": "shared"}],
+                value=["shared"]), width=3),
+            dbc.Col(dbc.Button("Compute", id="elemental-compute", n_clicks=0,
+                               outline=True, color="info", disabled=True), width=2),
+        ]),
+        html.Div(id="elemental-rows"),
+        html.Div(id="elemental-msg", className="text-info small"),
+        dbc.Row(className="g-2 align-items-center", children=[
+            dbc.Col(dbc.Button("Previous", id="elemental-prev", n_clicks=0,
+                               outline=True, color="secondary"), width="auto"),
+            dbc.Col(html.Span(id="elemental-position"), width="auto"),
+            dbc.Col(dbc.Button("Next", id="elemental-next", n_clicks=0,
+                               outline=True, color="secondary"), width="auto"),
+            dbc.Col(dbc.Button("Download all PNGs (ZIP)", id="elemental-download",
+                               n_clicks=0, outline=True, color="info"), width="auto"),
+        ]),
+        dbc.Row(className="g-2", children=[
+            dbc.Col(dcc.Graph(id="elemental-map", responsive=True), md=6),
+            dbc.Col(dcc.Graph(id="elemental-spectrum", responsive=True), md=6),
+        ]),
         html.Div(id="msg", style={"color": "orange"}),
         dcc.Store(id="roi-store", data=[0, H, 0, W]),
         dcc.Store(id="ch-store", data=[0, C]),
         dcc.Store(id="points-store", data=[]),
         dcc.Store(id="scale-store", data={"zmin": None, "zmax": None}),
         dcc.Store(id="cal-store", data=None),
+        dcc.Store(id="elemental-rows-store", data=[]),
+        dcc.Store(id="elemental-meta", data=[]),
+        dcc.Store(id="elemental-index", data=0),
         dcc.Store(id="cal-input-store", data=None),
         dcc.Store(id="gen", data=0),
         dcc.Download(id="map-download"),
+        dcc.Download(id="elemental-download-data"),
         dcc.Store(id="map-reset-store", data=0),
         dcc.Store(id="map-bind-store", data=0),
     ])
@@ -548,6 +678,223 @@ def build_app(cube=None):
                 return r
         return cur
 
+    def _elemental_rows_view(rows):
+        return [dbc.Row(className="g-2 align-items-end mb-2", children=[
+            dbc.Col(html.Span(
+                f"{_XRF_LINES[row['line_id']]['element']} "
+                f"({ _XRF_LINES[row['line_id']]['value']:g} keV)"), width=5),
+            dbc.Col([dbc.Label("Width (keV)"), dbc.Input(
+                id={"type": "elemental-width", "index": row["line_id"]},
+                type="text", value=row["width"])], width=4),
+            dbc.Col(dbc.Button("Remove", id={"type": "elemental-remove", "index": row["line_id"]},
+                               n_clicks=0, outline=True, color="danger"), width=2),
+        ]) for row in rows]
+
+    @app.callback([Output("elemental-rows-store", "data"),
+                   Output("elemental-rows", "children"),
+                   Output("elemental-add-line", "value"),
+                   Output("elemental-msg", "children")],
+                  Input("elemental-add", "n_clicks"),
+                  Input({"type": "elemental-remove", "index": ALL}, "n_clicks"),
+                  State("elemental-add-line", "value"),
+                  State("elemental-rows-store", "data"),
+                  State({"type": "elemental-width", "index": ALL}, "value"),
+                  prevent_initial_call=True)
+    def _edit_elemental_rows(_add, _remove_clicks, line_id, rows, widths):
+        rows = list(rows or [])
+        current_widths = {r["line_id"]: v for r, v in zip(rows, widths or [])}
+        rows = [{**r, "width": current_widths.get(r["line_id"], r["width"])} for r in rows]
+        trigger = ctx.triggered_id
+        message = ""
+        if trigger == "elemental-add":
+            if line_id is None:
+                return rows, _elemental_rows_view(rows), no_update, "Select an XRF line first"
+            if line_id in {r["line_id"] for r in rows}:
+                message = "That line is already in the list"
+            rows = _add_elemental_line(rows, line_id)
+            return rows, _elemental_rows_view(rows), None, message
+        if isinstance(trigger, dict) and trigger.get("type") == "elemental-remove":
+            rows = [r for r in rows if r["line_id"] != trigger["index"]]
+        return rows, _elemental_rows_view(rows), no_update, ""
+
+    @app.callback([Output("elemental-add", "disabled"),
+                   Output("elemental-compute", "disabled"),
+                   Output("elemental-prev", "disabled"),
+                   Output("elemental-next", "disabled"),
+                   Output("elemental-download", "disabled")],
+                  Input("cal-store", "data"), Input("elemental-add-line", "value"),
+                  Input("elemental-rows-store", "data"), Input("elemental-meta", "data"))
+    def _elemental_buttons(calibration, line_id, rows, meta):
+        ready = bool(calibration)
+        count = len(meta or [])
+        return (not (ready and line_id is not None), not (ready and rows),
+                count < 2, count < 2, count == 0)
+
+    @app.callback([Output("elemental-meta", "data", allow_duplicate=True),
+                   Output("elemental-index", "data", allow_duplicate=True),
+                   Output("elemental-msg", "children", allow_duplicate=True)],
+                  Input("cal-store", "data"), prevent_initial_call=True)
+    def _invalidate_elemental_maps(_calibration):
+        state["elemental_maps"] = []
+        state["elemental_spectrum"] = None
+        return [], 0, ""
+
+    @app.callback([Output("elemental-meta", "data", allow_duplicate=True),
+                   Output("elemental-msg", "children", allow_duplicate=True),
+                   Output("elemental-index", "data", allow_duplicate=True)],
+                  Input("elemental-compute", "n_clicks"),
+                  State("elemental-rows-store", "data"),
+                  State({"type": "elemental-width", "index": ALL}, "value"),
+                  State("cal-store", "data"),
+                  prevent_initial_call=True)
+    def _compute_elemental_maps(_n, rows, widths, calibration):
+        c = state["cube"]
+        if c is None:
+            return no_update, "Load a cube first", no_update
+        if not calibration:
+            return no_update, "Apply calibration first", no_update
+        if len(rows or []) != len(widths or []):
+            return no_update, "Each selected line needs a width", no_update
+        maps, metadata = [], []
+        full_spectrum = spectrum_from_roi(c, 0, c.shape[0], 0, c.shape[1])
+        try:
+            for row, width in zip(rows or [], widths or []):
+                line = _XRF_LINES[row["line_id"]]
+                start, end = _line_channel_range(line["value"], width,
+                                                 calibration, c.shape[2])
+                image = map_from_channels(c, start, end)
+                finite = image[np.isfinite(image)]
+                if not finite.size:
+                    raise ValueError(f"{line['element']}: map contains no finite values")
+                maps.append(image)
+                integration_width = float(str(width).strip().replace(",", "."))
+                actual_low = calibration["m"] * start + calibration["q"]
+                actual_high = calibration["m"] * (end - 1) + calibration["q"]
+                zone = [line["value"] - integration_width / 2,
+                        line["value"] + integration_width / 2]
+                zone_spectrum = full_spectrum[start:end]
+                zone_energies = calibrate(c.shape[2], calibration["m"], calibration["q"])[start:end]
+                weights = np.where(np.isfinite(zone_spectrum), zone_spectrum, 0.0)
+                count_sum = float(weights.sum())
+                metadata.append({"label": line["element"], "line_name": line["element"],
+                                 "source_file": state["name"],
+                                 "energy": line["value"], "line_centre_keV": line["value"],
+                                 "integration_width_keV": integration_width,
+                                 "integration_zone_keV": zone,
+                                 "channel_start": start, "channel_end_exclusive": end,
+                                 "channel_centres_keV": [float(actual_low), float(actual_high)],
+                                 "spectrum_centroid_keV": (
+                                     float(np.dot(weights, zone_energies) / count_sum)
+                                     if count_sum > 0 else None),
+                                 "minimum": float(finite.min()), "maximum": float(finite.max())})
+        except (KeyError, IndexError, TypeError, ValueError) as error:
+            return no_update, str(error), no_update
+        state["elemental_maps"] = maps
+        state["elemental_spectrum"] = full_spectrum
+        return metadata, f"Computed {len(maps)} full-field elemental maps", 0
+
+    @app.callback(Output("elemental-index", "data", allow_duplicate=True),
+                  Input("elemental-prev", "n_clicks"), Input("elemental-next", "n_clicks"),
+                  State("elemental-index", "data"), State("elemental-meta", "data"),
+                  prevent_initial_call=True)
+    def _elemental_navigate(_prev, _next, index, meta):
+        count = len(meta or [])
+        if not count:
+            return 0
+        step = -1 if ctx.triggered_id == "elemental-prev" else 1
+        return (int(index or 0) + step) % count
+
+    @app.callback(Output("elemental-position", "children"),
+                  Input("elemental-meta", "data"), Input("elemental-index", "data"))
+    def _elemental_position(meta, index):
+        return f"{min(int(index or 0), len(meta) - 1) + 1} / {len(meta)}" if meta else ""
+
+    @app.callback(Output("elemental-map", "figure"),
+                  Input("elemental-meta", "data"), Input("elemental-index", "data"),
+                  Input("elemental-shared-scale", "value"),
+                  Input("colorscale", "value"), Input("log", "value"))
+    def _elemental_figure(meta, index, shared, colorscale, log):
+        maps = state.get("elemental_maps", [])
+        if not meta or not maps:
+            return _empty_figure("Apply calibration, add lines, then Compute")
+        index = min(int(index or 0), len(meta) - 1)
+        current = meta[index]
+        if "shared" in (shared or []):
+            low = min(item["minimum"] for item in meta)
+            high = max(item["maximum"] for item in meta)
+        else:
+            low, high = current["minimum"], current["maximum"]
+        title = (f"{current['label']} ({current['energy']:g} keV), width "
+                 f"{current['integration_width_keV']:g} keV — range {current['minimum']:g}–"
+                 f"{current['maximum']:g} counts; scale {low:g}–{high:g} counts"
+                 f"{' (log1p)' if log and 'log' in log else ''}")
+        return _elemental_map_figure(maps[index], title, low, high,
+                                     colorscale, bool(log and "log" in log))
+
+    @app.callback(Output("elemental-spectrum", "figure"),
+                  Input("elemental-meta", "data"), Input("elemental-index", "data"),
+                  Input("cal-store", "data"), Input("log", "value"))
+    def _elemental_spectrum(meta, index, calibration, log):
+        spectrum = state.get("elemental_spectrum")
+        if not meta or spectrum is None or not calibration:
+            return _empty_figure("Spectrum appears after Compute")
+        index = min(int(index or 0), len(meta) - 1)
+        return _elemental_spectrum_figure(spectrum, calibration, meta[index],
+                                          bool(log and "log" in log))
+
+    @app.callback([Output("elemental-download-data", "data"),
+                   Output("elemental-msg", "children", allow_duplicate=True)],
+                  Input("elemental-download", "n_clicks"),
+                  State("elemental-meta", "data"),
+                  State("elemental-shared-scale", "value"),
+                  State("colorscale", "value"), State("log", "value"),
+                  State("cal-store", "data"),
+                  prevent_initial_call=True)
+    def _download_elemental_maps(_n, meta, shared, colorscale, log, calibration):
+        maps = state.get("elemental_maps", [])
+        if not meta or not maps or not calibration:
+            return no_update, "Compute maps first"
+        shared_range = (min(item["minimum"] for item in meta),
+                        max(item["maximum"] for item in meta))
+        archive = BytesIO()
+        with zipfile.ZipFile(archive, "w", compression=zipfile.ZIP_DEFLATED) as bundle:
+            manifest = []
+            for item_index, (item, image) in enumerate(zip(meta, maps)):
+                low, high = (shared_range if "shared" in (shared or []) else
+                             (item["minimum"], item["maximum"]))
+                safe_label = re.sub(r"[^A-Za-z0-9_-]+", "_", item["label"]).strip("_")
+                filename = (f"{safe_label}_{item['energy']:g}keV_"
+                            f"{item['integration_width_keV']:g}keV_{item_index + 1}.png")
+                spectrum_filename = filename.removesuffix(".png") + "_spectra.svg"
+                bundle.writestr(filename, _map_png_bytes(
+                    image, colorscale or "Viridis", low, high,
+                    bool(log and "log" in log)))
+                bundle.writestr(spectrum_filename, _spectrum_svg_bytes(
+                    state["elemental_spectrum"], calibration, item,
+                    bool(log and "log" in log)))
+                manifest.append({
+                    "file": filename, "spectrum_file": spectrum_filename,
+                    "source_file": item["source_file"],
+                    "min_count": low, "max_count": high,
+                    "map_min_count": item["minimum"], "map_max_count": item["maximum"],
+                    "line_name": item["line_name"],
+                    "line_centre_keV": item["line_centre_keV"],
+                    "integration_width_keV": item["integration_width_keV"],
+                    "integration_zone_keV": item["integration_zone_keV"],
+                    "channel_range_adc": [item["channel_start"], item["channel_end_exclusive"]],
+                    "channel_centres_keV": item["channel_centres_keV"],
+                    "spectrum_centroid_keV": item["spectrum_centroid_keV"],
+                    "calibration_keV_per_channel": calibration["m"],
+                    "calibration_intercept_keV": calibration["q"],
+                    "cube_shape": list(state["cube"].shape),
+                    "spatial_scope": "full field",
+                    "scale_mode": "shared" if "shared" in (shared or []) else "per-line autoscale",
+                    "colorscale": colorscale or "Viridis", "log1p": bool(log and "log" in log),
+                })
+            bundle.writestr("metadata.json", json.dumps(manifest, indent=2).encode("utf-8"))
+        return dcc.send_bytes(archive.getvalue(), "elemental_maps.zip"), \
+            f"Downloaded {len(meta)} maps and spectra"
+
     @app.callback([Output("ch-store", "data", allow_duplicate=True),
                    Output("line-msg", "children")],
                   Input("apply-line", "n_clicks"),
@@ -562,16 +909,9 @@ def build_app(cube=None):
         if state["cube"] is None:
             return no_update, "Load a cube first"
         try:
-            m, q = calibration["m"], calibration["q"]
-            width = float(width)
-            if not math.isfinite(width) or width <= 0:
-                raise ValueError("Width must be a positive number of keV")
-            start = math.ceil((float(line_energy) - width / 2 - q) / m)
-            end = math.floor((float(line_energy) + width / 2 - q) / m) + 1
             channels = state["cube"].shape[2]
-            start, end = max(0, start), min(channels, end)
-            if start >= end:
-                raise ValueError("Selected line and width do not overlap cube channels")
+            start, end = _line_channel_range(line_energy, width, calibration, channels)
+            width = float(width)
             return [start, end], f"Integrating {line_energy:g} ± {width / 2:g} keV"
         except (KeyError, TypeError, ValueError, ZeroDivisionError) as e:
             return no_update, str(e)
@@ -635,7 +975,9 @@ def build_app(cube=None):
     # --- M6: file loading (upload / link / change) ---------------------------
     @app.callback([Output("load-msg", "children"), Output("cube-name", "children"),
                    Output("zmin", "value"), Output("zmax", "value"),
-                   Output("gen", "data")],
+                   Output("gen", "data"), Output("cal-store", "data", allow_duplicate=True),
+                   Output("elemental-meta", "data", allow_duplicate=True),
+                   Output("elemental-index", "data", allow_duplicate=True)],
                   Input("upload", "contents"), State("upload", "filename"),
                   Input("load-url", "n_clicks"), State("url", "value"),
                   Input("change-file", "n_clicks"),
@@ -647,30 +989,39 @@ def build_app(cube=None):
         figure callbacks to recompute (selection stores may be stale)."""
         if n_change:
             state["cube"], state["name"] = None, ""
+            state["elemental_maps"] = []
+            state["elemental_spectrum"] = None
             return ("Cube cleared — upload a file or paste a link.",
-                    "— no cube loaded", None, None, (gen or 0) + 1)
+                    "— no cube loaded", None, None, (gen or 0) + 1, None, [], 0)
         if n_url and url and url.strip():
             try:
                 cube = download_cube(url.strip())
             except Exception as e:
-                return f"Download failed: {e}", no_update, no_update, no_update, no_update
+                return (f"Download failed: {e}", no_update, no_update, no_update,
+                        no_update, no_update, no_update, no_update)
             state["cube"], state["name"] = cube.array, cube.path.name
+            state["elemental_maps"] = []
+            state["elemental_spectrum"] = None
             h, w, c_ = cube.array.shape
             return (f"Loaded {cube.path.name} — {h} x {w} x {c_}",
                     f"— {cube.path.name} ({h} x {w} x {c_})",
-                    None, None, (gen or 0) + 1)
+                    None, None, (gen or 0) + 1, None, [], 0)
         if contents:
             try:
                 _, b64 = contents.split(",", 1)
                 data = base64.b64decode(b64)
                 cube = load_cube_bytes(data, filename or "")
             except Exception as e:
-                return f"Upload failed: {e}", no_update, no_update, no_update, no_update
+                return (f"Upload failed: {e}", no_update, no_update, no_update,
+                        no_update, no_update, no_update, no_update)
             state["cube"], state["name"] = cube.array, Path(filename or "cube").name
+            state["elemental_maps"] = []
+            state["elemental_spectrum"] = None
             h, w, c_ = cube.array.shape
             return (f"Loaded {state['name']} — {h} x {w} x {c_}",
                     f"— {state['name']} ({h} x {w} x {c_})",
-                    None, None, (gen or 0) + 1)
-        return no_update, no_update, no_update, no_update, no_update
+                    None, None, (gen or 0) + 1, None, [], 0)
+        return (no_update, no_update, no_update, no_update, no_update,
+                no_update, no_update, no_update)
 
     return app

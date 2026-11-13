@@ -37,15 +37,14 @@
 - [x] M17 — Keep map pixels square while enabling arbitrary rectangle selection; size the responsive map frame to the current ROI.
 - [x] M18 — Download the current map/visible ROI as a no-axes, no-colorbar, exact-pixel PNG using the active display colorscale and limits.
 
-## Done — M19–M25: interaction fixes and final notebook confirmation
+## Done — M19–M26: interactions and elemental gallery
 
 - [x] M19–M23 — Restore map double-click reset paths; ensure Apply calibration captures both current m/q values.
 - [x] M24 — Use plain text calibration inputs (comma or point decimals); transform map scale limits consistently in log mode, including PNG export.
 - [x] M25 — User confirmed calibration, log scale, and map reset work in the notebook. Latest full suite: 61 passed, 1 skipped (GPU).
+- [x] M26 — Full-field multi-line map/spectrum gallery, calibration gate, per-line widths, shared/default or per-line autoscale, range titles, and PNG/SVG/JSON ZIP export. Tests: 63 passed, 1 skipped (GPU).
 
 ## Later — not executable in Hermes' current environment
-
-- [ ] Proposed M26 — multi-line elemental-map gallery (awaiting user go-ahead; see Section 7 of `operational_plan.md`): unique searchable line rows with widths; require applied calibration; compute full-field pre-analysis maps independent of ROI; shared scale default or per-line autoscale; show range in titles; browse maps and download exact-pixel PNGs in one ZIP. No implementation started.
 
 - [ ] Drag-mode select on the map (deferred by user 2026-11-11): plotly drag-mode selection in addition to zoom = selection; zoom + numeric ROI panel cover the need for now.
 - [ ] Ask user to manually test Docker and Apptainer; WSLC was reported working by the user. Document results without claiming unverified container tests.

@@ -193,3 +193,9 @@ been performed as part of creating these templates. Do not invent entries.
 ### 2026-11-13 — M25: user confirms notebook interactions (completed)
 
 - **Evidence:** user reports calibration, log scale, and map interactions now all work in the notebook after rebuilding the app. This is user-side visual confirmation; no browser run was available in this environment.
+
+### 2026-11-13 — M26: full-field multi-line map/spectrum gallery (completed)
+
+- **Feature:** added unique searchable line rows with per-line widths, calibration gating, full-field elemental reductions independent of ROI, shared/default or per-line autoscale, and a previous/next side-by-side map/spectrum gallery. Full-field spectra show the selected integration zone and catalog center.
+- **Export:** ZIP contains exact-matrix PNG maps, vector `*_spectra.svg` spectra, and `metadata.json` with scale/data extrema, catalog line and integration bounds, ADC channel range, calibration, source filename, cube shape, display settings, and count-weighted spectrum centroid when defined. No dependency added; map/spectrum arrays remain server-side.
+- **Verification:** `.venv/bin/python -m pytest -q` → 63 passed, 1 skipped (GPU). Tests verify duplicate no-op, calibration gating, full-field map pixels, shared/autoscale limits, spectrum annotations, PNG/SVG contents, and manifest fields. Browser/Jupyter visual check not run in this environment.
