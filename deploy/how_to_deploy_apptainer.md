@@ -62,6 +62,8 @@ step.
 - [ ] `autorange` resets to full field/interval.
 - [ ] Numeric ROI panel and multi-point panels work (error msg on bad input).
 - [ ] `m`/`q` calibration switches the spectrum axis to keV.
+- [ ] With calibration applied, zooming the spectrum updates the matching channel interval on the map.
+- [ ] Select an XRF line and width → Apply selects its centered window; Reset scale clears zmin/zmax.
 
 ## Result log (fill in after your test)
 

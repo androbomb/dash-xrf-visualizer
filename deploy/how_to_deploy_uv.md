@@ -1,6 +1,6 @@
 # How to deploy — local uv + Jupyter
 
-**Status:** VERIFIED 2026-11-11 (WSL2, CPU-only JAX, RTX 5070 Ti present but unused).
+**Status:** VERIFIED 2026-11-11 (WSL2, CPU-only JAX, RTX 5070 Ti present but unused); UI callback suite last verified 2026-11-13.
 GPU variant is in `uv/README.md` and remains NOT TESTED.
 
 ## Steps
@@ -12,7 +12,7 @@ GPU variant is in `uv/README.md` and remains NOT TESTED.
    .venv/bin/python -m pytest -q
    ```
 
-   Expected: `49 passed, 1 skipped` (skip = GPU parity, not tested) in ~22 s.
+   Latest recorded result: `57 passed, 1 skipped` (GPU parity, not tested).
 
 2. Register the Jupyter kernel (once):
 
@@ -23,7 +23,9 @@ GPU variant is in `uv/README.md` and remains NOT TESTED.
 
 3. Open Jupyter/JupyterLab, open `example.ipynb` with kernel
    **Python 3.12 (xrf-viz)**, set `path_to_file = "/path/to/cube.npz"` (or
-   `.h5` / `.npy`) and Run All. The app renders inline in the notebook.
+   `.h5` / `.npy`) and Run All. The app renders inline in the notebook. To
+   avoid a scrollbar inside the embedded app, set `jupyter_height` in pixels,
+   e.g. `app.run(jupyter_mode="inline", debug=False, jupyter_height=1000)`.
 
 4. Alternatively, standalone server (preloaded cube):
 
@@ -45,6 +47,8 @@ GPU variant is in `uv/README.md` and remains NOT TESTED.
 - [ ] Numeric ROI panel → Apply updates the spectrum.
 - [ ] Multi-point rows/cols → Apply works; a non-numeric entry shows an error message and keeps the previous selection.
 - [ ] Set `m` (and `q`) → spectrum x-axis switches to keV.
+- [ ] After applying calibration, zoom the spectrum → matching channel interval updates the map.
+- [ ] Select an XRF line and width → Apply selects the centered energy window; Reset scale clears zmin/zmax.
 
 ## Result log (fill in after your test)
 

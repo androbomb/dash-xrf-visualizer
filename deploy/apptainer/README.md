@@ -19,3 +19,6 @@ apptainer run --bind /abs/path/to/xrf/data:/data \
 
 Then open http://localhost:8765. Apptainer binds work differently from Docker
 (`--bind src:dst`); adjust flags to your Apptainer version if needed.
+
+UI behavior includes calibration-aware spectrum selection and selectable XRF
+line windows; local/inline notebook sizing is documented in `../uv/README.md`.

@@ -16,8 +16,8 @@ parts were removed by decision; the custom CHNet raw reader is deferred.
   M2 (readers, `XRFlines`), M3 (JAX float64 reductions, bit-exact vs
   goldens) completed 2026-11-10; M4 (Dash UI) completed 2026-11-11 — see
   `timeline.md`.
-- M5 (deployment recipes) completed 2026-11-11 — **recipes only, NOT
-  TESTED**: `deploy/{docker,wslc,apptainer}/` + existing `deploy/uv/`.
+- M5 (deployment recipes) completed 2026-11-11: WSLC deployment reported
+  working by the user; Docker and Apptainer recipes remain **NOT TESTED**.
 - M6 (empty start + file loading) completed 2026-11-11: `build_app(None)`
   starts empty; upload (.npz/.h5/.npy) or http(s) link in the UI;
   `XRF_CUBE` optional in all containers.
@@ -46,8 +46,8 @@ parts were removed by decision; the custom CHNet raw reader is deferred.
   Plotly's shared color axis; Clear selection resets points, ROI and channels;
   calibration confirms and displays the active m/q values.
 - M13 (calibration refresh, ROI zoom, scale reset) completed 2026-11-13:
-  changing m/q refreshes both plots; Apply ROI disables `imshow` autorange so
-  both numeric axes zoom to the requested box; Reset scale clears zmin/zmax.
+  Apply ROI disables `imshow` autorange so both numeric axes zoom to the
+  requested box; Reset scale clears zmin/zmax.
 - M14 (explicit calibration, scale reset, line integration) completed 2026-11-13:
   Apply buttons commit settings to figure state; searchable JSON XRF lines can
   be integrated over a user-set width centered on the selected line energy.
@@ -55,11 +55,11 @@ parts were removed by decision; the custom CHNet raw reader is deferred.
   are converted from keV back to ADC channels; line Apply stays disabled until
   calibration is applied and the selected line is shown below its menu.
 
-## Setup (verified 2026-11-10)
+## Setup
 
 ```bash
 uv sync
-  .venv/bin/python -m pytest -q          # 57 passed + 1 GPU skip, CPU only
+.venv/bin/python -m pytest -q             # latest: 57 passed + 1 GPU skip
 .venv/bin/python -m ipykernel install --user --name xrf-viz \
     --display-name "Python 3.12 (xrf-viz)"
 ```
@@ -67,6 +67,16 @@ uv sync
 Requires [uv](https://docs.astral.sh/uv/); Python 3.12 is managed by uv via
 `.python-version`. In Jupyter/JupyterLab select the kernel
 **Python 3.12 (xrf-viz)**.
+
+Dash's inline notebook frame defaults to 650 px tall. Increase it to avoid an
+inner vertical scrollbar when the UI needs more space, for example:
+
+```python
+app.run(jupyter_mode="inline", debug=False, jupyter_height=1000)
+```
+
+`jupyter_height` is an integer number of pixels; raise it further if the
+notebook still scrolls inside the embedded app.
 
 ## Data formats
 
@@ -113,8 +123,7 @@ host, 2026-11-10). GPU is an opt-in, NOT TESTED variant —
   are overlaid on the map, and the log checkbox transforms both plotted sums.
 - M12: Apply scale commits `coloraxis.cmin/cmax`; Clear selection restores both
   plots to full bounds; calibration shows the active formula on the spectrum.
-- M13: m/q are live figure inputs (the button confirms calibration); Reset scale
-  clears both limits. Numeric ROI disables Plotly's reversed autorange and
+- M13: numeric ROI disables Plotly's reversed autorange and
   explicitly zooms both axes to x0..x1 and y0..y1.
 - M14: Apply calibration commits m/q to both plots; Apply scale commits zmin/zmax,
   while Reset scale clears the committed limits and their input fields. The
@@ -124,7 +133,8 @@ host, 2026-11-10). GPU is an opt-in, NOT TESTED variant —
   before updating the map's ADC interval. The line-selection Apply button is
   enabled by successful calibration; the selected line is displayed explicitly.
 - `example.ipynb`: set `path_to_file`, then `build_app(cube)` and
-  `app.run(jupyter_mode="inline")` (Dash 4.x); `app.run()` also works from a terminal.
+  `app.run(jupyter_mode="inline", jupyter_height=1000)` (Dash 4.x); the height
+  is in pixels. `app.run()` also works from a terminal.
 
 ## File loading (M6, implemented 2026-11-11)
 
@@ -149,6 +159,6 @@ host, 2026-11-10). GPU is an opt-in, NOT TESTED variant —
 pyproject.toml / uv.lock / .python-version   uv project (root, versioned)
 src/xrf_visualizer/                          data / processing / ui (M2–M4)
 tests/                                       pytest; fixtures/ + golden.json
-deploy/{docker,wslc,apptainer,uv}/           recipes & how-tos (M5; containers NOT TESTED)
+deploy/{docker,wslc,apptainer,uv}/           recipes & how-tos (Docker/Apptainer NOT TESTED)
 dash-xrf-analyzer/                           legacy reference (git-ignored, read-only)
 ```

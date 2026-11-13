@@ -1,7 +1,7 @@
 # How to deploy — WSLC (WSL Container)
 
-**Status:** NOT TESTED (recipe drafted 2026-11-11; run this in your
-environment and fill the result log). CPU-only JAX: no GPU passthrough.
+**Status:** The user reports successful WSLC deployment and UI use; the recipe
+has not been run in this environment. CPU-only JAX: no GPU passthrough.
 `wslc run` uses the docker short-flag form `-p` / `-v` / `-e` (verified
 against Microsoft's WSLC docs 2026-11-11); the `wslc build --tag --file`
 form worked in a real user build. If your version differs, check
@@ -22,7 +22,7 @@ form worked in a real user build. If your version differs, check
 2. Run — with a preloaded cube (adjust the path and cube filename):
 
    ```bash
-   wslc run -p 8765:8765 \
+   wslc run --name dash-xrf-viewer -p 8765:8765 \
        -v C:\Users\<you>\xrf-data:/data:ro \
        -e XRF_CUBE=/data/Mantegna_mappa3b_centro-sx_35kV-90uA.npz \
        xrf-viz
@@ -35,7 +35,7 @@ form worked in a real user build. If your version differs, check
    loaded" and you upload a file or paste a download link in the UI:
 
    ```bash
-   wslc run -p 8765:8765 xrf-viz
+   wslc run --name dash-xrf-viewer -p 8765:8765 xrf-viz
    ```
 
 3. Open `http://localhost:8765`. First request compiles the JAX reductions —
@@ -61,9 +61,12 @@ form worked in a real user build. If your version differs, check
 - [ ] `autorange` resets to full field/interval.
 - [ ] Numeric ROI panel and multi-point panels work (error msg on bad input).
 - [ ] `m`/`q` calibration switches the spectrum axis to keV.
+- [ ] With calibration applied, zooming the spectrum updates the matching channel interval on the map.
+- [ ] Select an XRF line and width → Apply selects its centered window; Reset scale clears zmin/zmax.
 
 ## Result log (fill in after your test)
 
 | date | wslc version | build | run | UI checks | notes |
 | ---- | ------------ | ----- | --- | --------- | ----- |
+| 2026-11-13 | not recorded | user-reported | user-reported | user reports expected behavior | exact version/checklist not recorded |
 |      |              |       |     |           |       |

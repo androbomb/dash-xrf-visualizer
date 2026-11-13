@@ -1,6 +1,6 @@
-# WSLC (WSL Container) recipe — **NOT TESTED** (no WSLC in the Hermes
-# environment; the user will run these). Same image as `../docker/`, built with
-# the `wslc` CLI. CPU-only JAX; GPU variant NOT TESTED.
+# WSLC (WSL Container) recipe — user reports successful deployment; not run in
+# this environment. Same image as `../docker/`, built with the `wslc` CLI.
+# CPU-only JAX; GPU variant NOT TESTED.
 
 Build (context = repository root):
 
@@ -12,7 +12,7 @@ Run (`XRF_CUBE` **optional**, M6 — without it the app starts empty and
 you upload a file or paste a download link in the UI):
 
 ```powershell
-wslc run -p 8765:8765 \
+wslc run --name dash-xrf-viewer -p 8765:8765 \
     -v C:\Users\<you>\xrf-data:/data:ro \
     -e XRF_CUBE=/data/Mantegna_mappa3b_centro-sx_35kV-90uA.npz \
     xrf-viz
@@ -20,7 +20,7 @@ wslc run -p 8765:8765 \
 
 In one line: 
 ```powershell
-wslc run -p 8765:8765 -v /abs/path/to/xrf/data:/data:ro -e XRF_CUBE=/data/Mantegna_mappa3b_centro-sx_35kV-90uA.npz xrf-viz
+wslc run --name dash-xrf-viewer -p 8765:8765 -v /abs/path/to/xrf/data:/data:ro -e XRF_CUBE=/data/Mantegna_mappa3b_centro-sx_35kV-90uA.npz xrf-viz
 ```
 
 
@@ -28,4 +28,5 @@ wslc run -p 8765:8765 -v /abs/path/to/xrf/data:/data:ro -e XRF_CUBE=/data/Manteg
 docker short-flag form. `-v` takes a Windows source path; drop `:ro` if
 your wslc version rejects it.)
 
-Then open http://localhost:8765.
+Then open http://localhost:8765. The user reports that the WSLC deployment and
+UI work correctly. Docker/Apptainer runtime recipes have not been tested.

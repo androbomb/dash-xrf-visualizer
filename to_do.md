@@ -1,7 +1,7 @@
 # XRF-only visualizer — project to-do
 
 > Future requirements are user decisions, not verified legacy implementation.
-> M0–M12 completed 2026-11-10/12 (evidence in `timeline.md`).
+> M0–M15 completed 2026-11-10/13 (evidence in `timeline.md`).
 
 ## Now — M1 baseline + approved docs (completed 2026-11-10)
 
@@ -31,11 +31,14 @@
 - [x] M10 — Follow-up UI action behavior: Apply ROI sets map axes and spectrum ROI; Apply interval sets spectrum axes and map interval; Apply scale explicitly refreshes color limits; legacy `jupyter_mode=True` is normalized to Dash 4's `"inline"`. Evidence: HTTP callback tests plus mode-normalization test.
 - [x] M11 — Plotly interactions and shared display behavior: accept actual `axis.range[n]` relayout payloads; overlay selected points on the map; apply log1p to map and spectrum counts; zmin/zmax are committed by Apply scale while colormap/log remain live. Evidence: HTTP callback test with real relayout keys and bit-exact map/spectrum data assertions.
 - [x] M12 — Scale/clear/calibration follow-up: apply zmin/zmax to Plotly's shared `coloraxis`; Clear selection resets points, ROI and channel interval; calibration displays a confirmation and active m/q. Evidence: HTTP callback tests verify coloraxis limits, all reset stores/axes, and calibration status/title/range.
+- [x] M13 — Fix ROI zoom bounds and scale reset; confirm calibration behavior on real Ragazzo-triste data.
+- [x] M14 — Commit calibration and scale settings only on their buttons; add searchable `XRFlines.json` selection and width-centered channel integration.
+- [x] M15 — Convert calibrated spectrum selections from keV back to ADC channels; gate line Apply on calibration and show the selected line.
 
 ## Later — not executable in Hermes' current environment
 
 - [ ] Drag-mode select on the map (deferred by user 2026-11-11): plotly drag-mode selection in addition to zoom = selection; zoom + numeric ROI panel cover the need for now.
-- [ ] Ask user to manually test Docker, WSLC and Apptainer; document real test results (do not claim they passed).
+- [ ] Ask user to manually test Docker and Apptainer; WSLC was reported working by the user. Document results without claiming unverified container tests.
 - [ ] GPU validation on the user's WSL2 (RTX 5070 Ti / sm_120, cu12): `jax[cuda12]` variant + VRAM behavior with the documented XLA flags.
 - [ ] Review removal of legacy `dash-xrf-analyzer/` **only after explicit final user approval**.
 

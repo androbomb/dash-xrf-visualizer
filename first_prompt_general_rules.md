@@ -3,6 +3,9 @@
 `AGENTS.md` and `operational_plan.md` are the authoritative repository rules;
 this file is a compact reminder and never grants extra permission.
 
+> Historical bootstrap prompt — M0. This records the original read-only setup
+> instructions, not current project status. See `README.md` and `timeline.md`.
+
 - First verify the user-supplied repository root. For this project Hermes sees
   `/workspace/exchange/dash-xrf-visualizer` (not the later XRF *data file* path).
 - In **M0**: READ ONLY; check git status, architecture, callbacks, readers and

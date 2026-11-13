@@ -1,5 +1,8 @@
 # Messaggio iniziale per Hermes (copia il testo del blocco)
 
+> Prompt storico di bootstrap — M0. Questo testo conserva le istruzioni
+> iniziali in sola lettura; lo stato attuale è in `README.md` e `timeline.md`.
+
 ```text
 Ciao Hermes. Avvia l'audit della mia vecchia applicazione Plotly Dash per dati XRF.
 

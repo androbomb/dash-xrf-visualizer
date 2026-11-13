@@ -1,8 +1,8 @@
 # Project agent rules — XRF-only Dash / Jupyter / JAX refactor
 
-These rules apply to Hermes and any other agent working in the XRF visualizer repository. Prioritize scientific correctness, readable maintainable Python, resource limits, reproducibility and user-authorized scope over speed. **M0–M6 completed (2026-11-10/11): read-only audit, uv environment + fixture/tests, data readers, JAX float64 processing (bit-exact vs goldens), Dash UI (zoom = selection, verified E2E), deploy recipes (NOT TESTED), empty start + upload/link file loading (verified E2E over HTTP).** `operational_plan.md` is the single source of truth for exact feature decisions and the proposed layout. The legacy repository was audited read-only during M0; findings are in `scientific_notes.md` and `timeline.md`.
+These rules apply to Hermes and any other agent working in the XRF visualizer repository. Prioritize scientific correctness, readable maintainable Python, resource limits, reproducibility and user-authorized scope over speed. **M0–M15 completed (2026-11-10/13):** data readers, JAX float64 processing, Dash UI and callbacks, calibration/line-window selection, scale and ROI controls; WSLC was user-tested, Docker and Apptainer recipes remain NOT TESTED. `operational_plan.md` is the single source of truth for exact feature decisions and the proposed layout. The legacy repository was audited read-only during M0; findings are in `scientific_notes.md` and `timeline.md`.
 
-## Project snapshot — user requirements (not yet observed code)
+## Project snapshot — original user requirements (implementation status in README/timeline)
 
 - Repository root as seen by Hermes: `/workspace/exchange/dash-xrf-visualizer`; verify first.
 - Goal: **visualizer only**. Retain HDF5 XRF reading, left 2-D intensity map, right spectrum, spectral interval selection → map recomputation, spatial ROI selection → spectrum recomputation; **add** `.npz` / `.npy` support.

@@ -141,3 +141,9 @@ been performed as part of creating these templates. Do not invent entries.
 - **Root cause:** after calibration, Plotly emits spectrum relayout bounds in keV, but the map interval callback treated them as ADC channel indices.
 - **Fix:** inverse-transform selected bounds with `(E-q)/m`, with floating-point edge tolerance, before updating the channel interval. The XRF-line Apply button is disabled until calibration is applied, and a persistent label repeats the chosen line and energy.
 - **Verification:** `uv run pytest -q` → 57 passed, 1 skipped (GPU); UI HTTP test maps a calibrated energy selection back to expected channels, and tests verify line button enablement and the selected-line label. `git diff --check` is clean.
+
+### 2026-11-13 — M16: documentation sync and notebook sizing guidance (completed)
+
+- **Docs:** synchronized current UI behavior and deployment status across README, operational plan, scientific notes, to-do, agent guidance, and deployment guides. Marked the original M0 prompts as archival; recorded the user's WSLC success report while keeping Docker/Apptainer untested.
+- **Notebook:** confirmed the installed Dash `run()` signature accepts `jupyter_height: int` (default 650 px). Use `jupyter_height=1000` to give the inline app more vertical space; the user will update `example.ipynb`.
+- **Verification:** documentation-only change; no code tests run. `example.ipynb` remains untouched by this task.

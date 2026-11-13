@@ -24,3 +24,6 @@ Without `XRF_CUBE` (and no bind) the app starts empty: upload a
 Then open http://localhost:8765. Tests are not installed in the image
 (`uv sync --frozen --no-dev`); add the `dev` group inside the container if
 needed.
+
+UI behavior includes calibration-aware spectrum selection and selectable XRF
+line windows; local/inline notebook sizing is documented in `../uv/README.md`.

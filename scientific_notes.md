@@ -24,7 +24,16 @@ the read-only audit of 2026-11-10 (legacy code + example files); facts marked
   keV calibration from an array.
 - **Manual calibration:** `E(i) = m·i + q` with `m` in keV/channel and `q` in
   keV, entered by the user in the UI. For C channels this spans `q` to
-  `m·(C−1)+q`.
+  `m·(C−1)+q`; the UI accepts finite `m > 0` so the plotted energy axis is
+  increasing. Calibration rescales plotted X coordinates and does not alter
+  cube values.
+- **Calibrated zoom:** a spectrum selection `[E_lo,E_hi]` maps back to ADC via
+  `(E-q)/m` before recomputing the map.
+- **XRF line window:** for catalog line energy `E_line` and requested width `w`
+  (keV), the selected channels are those with center energies in
+  `[E_line-w/2, E_line+w/2]`; the map still uses an unweighted discrete sum of
+  those channels. The line catalog supplies reference energies, not detector
+  calibration.
 - Historical notes (context only, not reused):
   - Legacy hardcoded `0.5–38.5 keV` over all channels (`RendererXRF._E_int`,
     `BASIC_ENERGY_RANGE_FOR_CALIBRATION`); user-confirmed as a remnant of

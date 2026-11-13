@@ -28,6 +28,10 @@ python -m ipykernel install --user --name xrf-viz --display-name "Python 3.12 (x
 
 In Jupyter/JupyterLab select the kernel **Python 3.12 (xrf-viz)**.
 
+Dash's inline output defaults to 650 px high. To reduce scrolling inside the
+embedded app, pass a larger integer pixel height, for example
+`app.run(jupyter_mode="inline", debug=False, jupyter_height=1000)`.
+
 ## Compute backend: CPU by default (verified), GPU opt-in (NOT TESTED)
 
 - The default install is **CPU-only JAX** (plain `jax` package, no CUDA
