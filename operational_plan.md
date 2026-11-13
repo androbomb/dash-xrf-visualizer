@@ -182,3 +182,11 @@ These are planning checkpoints, NOT evidence of work performed. Use small revers
 
 - **TO DO (user decision, on hold):** drag-mode select on the map — plotly drag-mode selection in addition to zoom = selection. Tracked in `to_do.md` (Later); implement only on explicit request.
 - User-side: run the `deploy/` recipes (`how_to_deploy_*.md`), GPU validation on WSL2 (RTX 5070 Ti, `jax[cuda12]` variant), visual browser pass of the UI, removal decision for `dash-xrf-analyzer/`.
+
+### Proposed M26 — multi-line elemental-map gallery (awaiting user approval)
+
+- **UX:** add a separated panel below the existing controls. Proposed editor: one searchable `XRFlines.json` dropdown + positive width-in-keV text/number input per row, with add/remove row controls; `Compute` generates one map per pair. Show the result in a manually navigable gallery with a title naming the line and width, and a button that downloads all maps in one ZIP.
+- **Scientific behavior to reuse:** require the applied manual m/q calibration (as the existing line Apply does); interpret width as the full keV window centered on the catalog energy, `[E_line-width/2, E_line+width/2]`; include channel centers in that interval and sum counts with the existing unweighted float64 channel reduction. Reject invalid/non-overlapping windows using the existing validation convention.
+- **Proposed presentation/export:** full-field maps by default, preserve exact square-pixel PNGs without axes/colorbar, and reuse the current colorscale/log/scale settings. Keep generated map arrays server-side rather than sending a cube or many arrays through `dcc.Store`.
+- **Implementation scope after approval:** line-row controls and validation, multi-window map computation, manual gallery navigation/title, ZIP creation using the existing PNG encoder plus stdlib `zipfile`, focused processing/UI/ZIP tests, and updates to README/timeline after verification.
+- **Open decisions:** whether rows may repeat the same line; whether to use only applied m/q or also an optional file `energy` vector; whether maps should honor the current spatial ROI and whether the gallery should share current z/log limits or independently auto-scale. The user was asked to confirm row/duplicate behavior, calibration source, and scale/export preference. No feature code has been started.

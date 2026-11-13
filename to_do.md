@@ -45,6 +45,8 @@
 
 ## Later — not executable in Hermes' current environment
 
+- [ ] Proposed M26 — multi-line elemental-map gallery (awaiting user approval; see Section 7 of `operational_plan.md`). Resolve per-line row/duplicate policy, energy-axis source, and map ROI/scale behavior before implementation.
+
 - [ ] Drag-mode select on the map (deferred by user 2026-11-11): plotly drag-mode selection in addition to zoom = selection; zoom + numeric ROI panel cover the need for now.
 - [ ] Ask user to manually test Docker and Apptainer; WSLC was reported working by the user. Document results without claiming unverified container tests.
 - [ ] GPU validation on the user's WSL2 (RTX 5070 Ti / sm_120, cu12): `jax[cuda12]` variant + VRAM behavior with the documented XLA flags.
