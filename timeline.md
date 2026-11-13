@@ -188,4 +188,4 @@ been performed as part of creating these templates. Do not invent entries.
 ### 2026-11-13 — M24: plain text calibration inputs and log-scale regression (implemented)
 
 - **Docs check:** official Dash/dbc docs show input `value` accepts strings or numbers; the invalid-value-to-`None` behavior applies to numeric inputs, and `inputMode` is only a browser hint. Replaced m/q with Dash Core `dcc.Input(type="text")`; parser accepts both decimal commas and points.
-- **Fix / verification:** regression covers m=0,075, q=0,1199 and applying log while raw-count zmax=2000 is committed; HTTP figure returns coloraxis limits transformed with `log1p`. Full suite: `uv run pytest -q` → 61 passed, 1 skipped (GPU).
+- **Fix / verification:** regression covers m=0,075, q=0,1199 and applying log while raw-count zmax=2000 is committed; HTTP figure and exact-pixel PNG export use color limits transformed with `log1p`. Full suite: `uv run pytest -q` → 61 passed, 1 skipped (GPU).

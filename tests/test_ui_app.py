@@ -415,6 +415,25 @@ def test_download_current_map_is_cropped_pixel_exact_png(cube):
         "Hot", [value], colortype="tuple")[0]) * 255).astype(np.uint8)
     assert np.array_equal(np.frombuffer(raw[1:5], dtype=np.uint8), [*expected, 255])
 
+    log_data = _http_callback(app, "map-download.data", {"download-map.n_clicks": 1},
+        {"ch-store.data": [100, 110], "roi-store.data": [10, 12, 20, 23],
+         "colorscale.value": "Hot", "log.value": ["log"],
+         "scale-store.data": {"zmin": 1, "zmax": 2000}}, "download-map.n_clicks")
+    png = base64.b64decode(log_data["content"])
+    pos, compressed = 8, b""
+    while pos < len(png):
+        size = struct.unpack(">I", png[pos:pos + 4])[0]
+        kind = png[pos + 4:pos + 8]
+        if kind == b"IDAT":
+            compressed += png[pos + 8:pos + 8 + size]
+        pos += 12 + size
+    raw = zlib.decompress(compressed)
+    logged = np.log1p(current[0, 0])
+    value = np.clip((logged - np.log1p(1)) / (np.log1p(2000) - np.log1p(1)), 0, 1)
+    expected = np.rint(np.asarray(sample_colorscale(
+        "Hot", [value], colortype="tuple")[0]) * 255).astype(np.uint8)
+    assert np.array_equal(np.frombuffer(raw[1:5], dtype=np.uint8), [*expected, 255])
+
 
 def test_clear_selection_resets_both_plots(cube):
     app = build_app(cube)

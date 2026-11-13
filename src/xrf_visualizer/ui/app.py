@@ -101,9 +101,13 @@ def _png_chunk(kind, data):
             + struct.pack(">I", zlib.crc32(kind + data) & 0xFFFFFFFF))
 
 
-def _map_png_bytes(image, colorscale, zmin=None, zmax=None):
+def _map_png_bytes(image, colorscale, zmin=None, zmax=None, log=False):
     """Encode one source map value per RGBA PNG pixel, with no plot furniture."""
     image = np.asarray(image, dtype=np.float64)
+    if log:
+        image = np.log1p(image)
+        zmin = np.log1p(max(0.0, float(zmin))) if zmin is not None else None
+        zmax = np.log1p(max(0.0, float(zmax))) if zmax is not None else None
     valid = np.isfinite(image)
     if valid.any():
         low = float(zmin) if zmin is not None else float(image[valid].min())
@@ -467,8 +471,6 @@ def build_app(cube=None):
             return no_update
         start, end = channels
         image = map_from_channels(c, start, end)
-        if log:
-            image = np.log1p(image)
         if roi:
             y0, y1, x0, x1 = _clamp_roi(*image.shape, *roi)
             image = image[y0:y1, x0:x1]
@@ -476,7 +478,7 @@ def build_app(cube=None):
             return no_update
         scale = scale or {}
         png = _map_png_bytes(image, colorscale or "Viridis",
-                             scale.get("zmin"), scale.get("zmax"))
+                             scale.get("zmin"), scale.get("zmax"), bool(log))
         return dcc.send_bytes(png, "xrf_map.png")
 
     @app.callback(Output("spectrum", "figure"),
