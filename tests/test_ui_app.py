@@ -20,6 +20,8 @@ from xrf_visualizer.ui.app import (
     _add_elemental_line,
     _ch_from_relayout,
     _clamp_roi,
+    _calibration_from_points,
+    _parse_calibration_point,
     _line_channel_range,
     _map_png_bytes,
     _parse_points,
@@ -344,7 +346,8 @@ def test_http_map_controls_and_calibration(cube):
     assert "cmin" not in reset_fig["layout"]["coloraxis"]
     assert "cmax" not in reset_fig["layout"]["coloraxis"]
 
-    cal_key = next(k for k, spec in app.callback_map.items() if "cal-store.data" in k)
+    cal_key = next(k for k, spec in app.callback_map.items()
+                   if any(item["id"] == "cal-input-store" for item in spec["inputs"]))
     calibration, message, apply_line_disabled = _http_callback(app, cal_key,
         {"cal-input-store.data": {"m": "0.5", "q": "1"}}, {},
         "cal-input-store.data")
@@ -461,7 +464,8 @@ def test_calibration_inputs_accept_full_float_precision(cube):
     assert _component(app.layout, "q").to_plotly_json()["namespace"] == "dash_core_components"
     assert _component(app.layout, "m").type == "text"
     assert _component(app.layout, "q").type == "text"
-    cal_key = next(k for k, spec in app.callback_map.items() if "cal-store.data" in k)
+    cal_key = next(k for k, spec in app.callback_map.items()
+                   if any(item["id"] == "cal-input-store" for item in spec["inputs"]))
     calibration, message, _ = _http_callback(app, cal_key,
         {"cal-input-store.data": {"m": "0,075", "q": "0,1199"}}, {},
         "cal-input-store.data")
@@ -469,6 +473,38 @@ def test_calibration_inputs_accept_full_float_precision(cube):
     assert message == "Applied: E = 0.075 × channel + 0.1199 keV"
     fig = spectrum_figure(cube, m=calibration["m"], q=calibration["q"])
     assert fig.layout.xaxis.title.text == "E (keV; m=0.075, q=0.1199)"
+
+
+def test_calibration_point_pair_and_ols_fit_are_applied(cube):
+    assert _calibration_from_points([
+        {"channel": 0, "energy": 1.1}, {"channel": 10, "energy": 3.1},
+    ]) == pytest.approx((0.2, 1.1))
+    m, q = _calibration_from_points([
+        {"channel": 0, "energy": 1}, {"channel": 10, "energy": 3},
+        {"channel": 20, "energy": 6},
+    ])
+    assert m == pytest.approx(0.25)
+    assert q == pytest.approx(5 / 6)
+    assert _parse_calibration_point("7", "0,123456789012345") == {
+        "channel": 7, "energy": 0.123456789012345}
+    with pytest.raises(ValueError, match="integer"):
+        _parse_calibration_point("7.5", "1.2")
+    with pytest.raises(ValueError, match="distinct"):
+        _calibration_from_points([
+            {"channel": 3, "energy": 1}, {"channel": 3, "energy": 2},
+        ])
+
+    app = build_app(cube)
+    fit = next(spec["callback"].__wrapped__ for spec in app.callback_map.values()
+               if any(item["id"] == "cal-point-fit" for item in spec["inputs"]))
+    calibration, status, point_status, line_disabled, m_text, q_text = fit(1, [
+        {"channel": 0, "energy": 1}, {"channel": 10, "energy": 3},
+        {"channel": 20, "energy": 6},
+    ])
+    assert calibration == pytest.approx({"m": 0.25, "q": 5 / 6})
+    assert "Applied fit from 3 points" in status and point_status == status
+    assert line_disabled is False
+    assert float(m_text) == calibration["m"] and float(q_text) == calibration["q"]
 
 
 def test_download_current_map_is_cropped_pixel_exact_png(cube):

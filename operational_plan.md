@@ -1,6 +1,6 @@
 # Operational plan — XRF-only visualizer (Dash / Jupyter / JAX)
 
-> **Status:** requirements implemented — M0–M26 completed 2026-11-10/13 (M3–M26 evidence in `timeline.md`).
+> **Status:** requirements implemented — M0–M27 completed 2026-11-10/13 (M3–M27 evidence in `timeline.md`).
 > **Remaining:** Docker/Apptainer user-side tests, GPU validation, deferred items in Section 7. WSLC was reported working by the user.
 > **Repository path seen by Hermes:** `/workspace/exchange/dash-xrf-visualizer`.
 > M0 (read-only audit, 2026-11-10) verified the legacy code and the user-supplied example data; findings are recorded in `scientific_notes.md` and `timeline.md`. The decisions explicitly fixed below must not be reopened unnecessarily.
@@ -189,3 +189,8 @@ These are planning checkpoints, NOT evidence of work performed. Use small revers
 - **Numerics:** applied manual m/q only. For each line, select calibrated channel centers in `[E_line-width/2, E_line+width/2]` and sum with the existing unweighted float64 reduction over the whole H×W field, independent of ROI, points or spectrum selection. The associated spectrum is the full-field sum over all channels; include its count-weighted centroid inside the selected zone when defined.
 - **Scale/export:** shared full-field count range by default, or per-line autoscale; reuse current colormap and log1p setting. ZIP contains exact-size, axis/colorbar-free map PNGs, matching vector `*_spectra.svg` plots, and `metadata.json` with filenames, scale/data ranges, line/window/channel bounds, calibration, cube shape, source filename, display settings and observed centroid. Arrays remain server-side; no dependency added.
 - **Verification:** tests cover duplicate no-op, calibration gating, decimal widths, full-field reduction, gallery ranges, spectrum zone, shared/per-line scale, PNG/SVG export and manifest. Full suite: 63 passed, 1 skipped (GPU). Browser/Jupyter visual verification remains user-side.
+
+### M27 — calibration from reference points (completed 2026-11-13)
+
+- Add any number of `(channel, energy_keV)` pairs, minimum two. Channel is an integer input; energy is parsed from text (decimal comma or point). Two points calculate the exact line; more than two use ordinary least squares. Require distinct channels, finite energies, and positive finite slope. Display full-precision coefficients, update m/q inputs, and apply via the existing calibration store.
+- Verification: two-point, OLS, parsing/precision, invalid input and applied-calibration tests; full suite 64 passed, 1 skipped (GPU).

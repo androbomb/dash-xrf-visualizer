@@ -194,6 +194,32 @@ def _add_elemental_line(rows, line_id):
     return [*rows, {"line_id": line_id, "width": 0.1}]
 
 
+def _calibration_from_points(points):
+    if len(points) < 2:
+        raise ValueError("Add at least two channel/energy points")
+    x = np.asarray([int(point["channel"]) for point in points], dtype=np.float64)
+    y = np.asarray([float(str(point["energy"]).strip().replace(",", "."))
+                     for point in points], dtype=np.float64)
+    if not np.isfinite(x).all() or not np.isfinite(y).all() or np.unique(x).size < 2:
+        raise ValueError("Channels must include at least two distinct integers and energies must be finite")
+    if len(points) == 2:
+        m = (y[1] - y[0]) / (x[1] - x[0])
+    else:
+        m = float(np.polyfit(x, y, 1)[0])
+    q = float(y.mean() - m * x.mean())
+    if not math.isfinite(m) or m <= 0 or not math.isfinite(q):
+        raise ValueError("Calibration slope must be positive and coefficients finite")
+    return float(m), q
+
+
+def _parse_calibration_point(channel, energy):
+    x = float(channel)
+    y = float(str(energy).strip().replace(",", "."))
+    if not math.isfinite(x) or not x.is_integer() or not math.isfinite(y):
+        raise ValueError("Channel must be an integer and energy must be finite")
+    return {"channel": int(x), "energy": y}
+
+
 def _elemental_map_figure(image, title, zmin, zmax, colorscale, log):
     shown = np.log1p(image) if log else image
     fig = px.imshow(shown, color_continuous_scale=colorscale or "Viridis", aspect="equal",
@@ -471,6 +497,20 @@ def build_app(cube=None):
                     dbc.Col(dbc.Button("Apply calibration", id="apply-calibration", n_clicks=0, outline=True, color="info"), width=12),
                     dbc.Col(html.Div(id="cal-msg", className="text-info small"), width=12),
                 ]),
+                html.B("Fit calibration from channel/energy points"),
+                dbc.Row(className="g-2 align-items-end mt-1", children=[
+                    dbc.Col([dbc.Label("x (integer channel)"), dbc.Input(
+                        id="cal-point-x", type="number", step=1)], width=3),
+                    dbc.Col([dbc.Label("y (energy, keV)"), dcc.Input(
+                        id="cal-point-y", type="text", className="form-control",
+                        placeholder="e.g. 6.404123456")], width=4),
+                    dbc.Col(dbc.Button("Add point", id="cal-point-add", n_clicks=0,
+                                       outline=True, color="info"), width=2),
+                    dbc.Col(dbc.Button("Fit & apply", id="cal-point-fit", n_clicks=0,
+                                       disabled=True, outline=True, color="info"), width=3),
+                    dbc.Col(html.Div(id="cal-point-rows"), width=12),
+                    dbc.Col(html.Div(id="cal-point-msg", className="text-info small"), width=12),
+                ]),
                 dbc.Row(className="g-2 align-items-end mt-1", children=[
                     dbc.Col([dbc.Label("Select Line"), dcc.Dropdown(
                         id="line-select", options=[
@@ -523,6 +563,7 @@ def build_app(cube=None):
         dcc.Store(id="points-store", data=[]),
         dcc.Store(id="scale-store", data={"zmin": None, "zmax": None}),
         dcc.Store(id="cal-store", data=None),
+        dcc.Store(id="cal-points-store", data=[]),
         dcc.Store(id="elemental-rows-store", data=[]),
         dcc.Store(id="elemental-meta", data=[]),
         dcc.Store(id="elemental-index", data=0),
@@ -937,6 +978,54 @@ def build_app(cube=None):
             return pts, "", no_update, no_update
         except ValueError as e:
             return no_update, str(e), no_update, no_update
+
+    def _calibration_point_rows(points):
+        return [dbc.Row(className="g-1 align-items-center mb-1", children=[
+            dbc.Col(html.Span(f"x: {point['channel']}  |  y: {point['energy']:.17g} keV"), width=9),
+            dbc.Col(dbc.Button("Remove", id={"type": "cal-point-remove", "index": i},
+                               n_clicks=0, size="sm", outline=True, color="danger"), width=3),
+        ]) for i, point in enumerate(points)]
+
+    @app.callback([Output("cal-points-store", "data"), Output("cal-point-rows", "children"),
+                   Output("cal-point-x", "value"), Output("cal-point-y", "value"),
+                   Output("cal-point-msg", "children")],
+                  Input("cal-point-add", "n_clicks"),
+                  Input({"type": "cal-point-remove", "index": ALL}, "n_clicks"),
+                  State("cal-points-store", "data"), State("cal-point-x", "value"),
+                  State("cal-point-y", "value"), prevent_initial_call=True)
+    def _edit_calibration_points(_add, _remove, points, channel, energy):
+        points = list(points or [])
+        trigger = ctx.triggered_id
+        if trigger == "cal-point-add":
+            try:
+                point = _parse_calibration_point(channel, energy)
+            except (TypeError, ValueError):
+                return points, _calibration_point_rows(points), no_update, no_update, \
+                    "Enter an integer channel and a finite energy"
+            points.append(point)
+            return points, _calibration_point_rows(points), None, "", ""
+        if isinstance(trigger, dict) and trigger.get("type") == "cal-point-remove":
+            points.pop(trigger["index"])
+        return points, _calibration_point_rows(points), no_update, no_update, ""
+
+    @app.callback(Output("cal-point-fit", "disabled"), Input("cal-points-store", "data"))
+    def _calibration_fit_enabled(points):
+        return len(points or []) < 2
+
+    @app.callback([Output("cal-store", "data", allow_duplicate=True),
+                   Output("cal-msg", "children", allow_duplicate=True),
+                   Output("cal-point-msg", "children", allow_duplicate=True),
+                   Output("apply-line", "disabled", allow_duplicate=True),
+                   Output("m", "value"), Output("q", "value")],
+                  Input("cal-point-fit", "n_clicks"), State("cal-points-store", "data"),
+                  prevent_initial_call=True)
+    def _fit_calibration(_n, points):
+        try:
+            m, q = _calibration_from_points(points or [])
+        except (TypeError, ValueError, np.linalg.LinAlgError) as error:
+            return no_update, no_update, str(error), no_update, no_update, no_update
+        message = f"Applied fit from {len(points)} points: m = {m:.17g}, q = {q:.17g} keV"
+        return {"m": m, "q": q}, message, message, False, format(m, ".17g"), format(q, ".17g")
 
     @app.callback([Output("cal-store", "data"), Output("cal-msg", "children"),
                    Output("apply-line", "disabled")],

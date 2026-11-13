@@ -199,3 +199,9 @@ been performed as part of creating these templates. Do not invent entries.
 - **Feature:** added unique searchable line rows with per-line widths, calibration gating, full-field elemental reductions independent of ROI, shared/default or per-line autoscale, and a previous/next side-by-side map/spectrum gallery. Full-field spectra show the selected integration zone and catalog center.
 - **Export:** ZIP contains exact-matrix PNG maps, vector `*_spectra.svg` spectra, and `metadata.json` with scale/data extrema, catalog line and integration bounds, ADC channel range, calibration, source filename, cube shape, display settings, and count-weighted spectrum centroid when defined. No dependency added; map/spectrum arrays remain server-side.
 - **Verification:** `.venv/bin/python -m pytest -q` → 63 passed, 1 skipped (GPU). Tests verify duplicate no-op, calibration gating, full-field map pixels, shared/autoscale limits, spectrum annotations, PNG/SVG contents, and manifest fields. Browser/Jupyter visual check not run in this environment.
+
+
+### 2026-11-13 — M27: calibration from reference points (completed)
+
+- **Feature:** dynamic channel/energy point list; integer channels and precision-preserving text energies. Exactly two pairs calculate m/q directly; three or more use OLS. Coefficients are displayed, copied into m/q fields, and applied to existing plots and map features.
+- **Verification:** `.venv/bin/python -m pytest -q` → 64 passed, 1 skipped (GPU); covers direct two-point calculation, multi-point OLS, decimal parsing, invalid channels, and applied coefficients.

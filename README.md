@@ -62,6 +62,8 @@ parts were removed by decision; the custom CHNet raw reader is deferred.
   the selected interval and visible spatial ROI as one exact-size PNG pixel
   per XRF pixel, with the chosen colorscale/limits/log transform and no axes
   or colorbar.
+- M27 (reference-point calibration) completed 2026-11-13: two points use
+  direct line calculation; three or more use OLS, and the result is applied.
 - M26 (multi-line elemental maps) completed 2026-11-13: calibrated full-field
   maps with per-line integration widths, shared/default or per-line autoscale,
   an associated full-field spectrum, and ZIP export (map PNGs, vector spectrum
@@ -171,6 +173,9 @@ host, 2026-11-10). GPU is an opt-in, NOT TESTED variant —
 - M24: calibration uses plain text inputs (comma or point decimal); log mode
   transforms map data and raw-count zmin/zmax together, including PNG export.
 - M25: user confirmed calibration, log scale and map reset work in the notebook.
+- M27: add integer-channel / precise text-energy pairs under calibration. Two
+  points calculate the line directly; three or more use OLS. Fitted m/q are
+  displayed at round-trip precision and applied immediately.
 - M26: below the existing UI, add unique XRF catalog lines and set each
   integration width in keV. Apply calibration before adding or computing.
   Compute integrates each line over the **full field**, regardless of current
