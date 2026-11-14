@@ -3,6 +3,9 @@
 # Bootstrap/reference-only original. Never use as the runtime source package.
 /dash-xrf-analyzer/
 
+# Kickstart template for similar projects (local only, never committed).
+/templates-similar-project/
+
 # example data 
 data_example/
 
