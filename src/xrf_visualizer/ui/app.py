@@ -12,7 +12,9 @@ via upload (.npz/.h5/.npy) or an http(s) link in the UI; "Change file"
 clears it. The current cube lives in a Python-side closure (``state``),
 never in a dash Store (too big for JSON round-trips). Selection stores may
 be stale after a new load; the processing layer clamps, and a ``gen`` store
-bump forces the figure callbacks to recompute.
+bump forces the figure callbacks to recompute. Elemental gallery
+results are committed as a revision-stamped record: a stale result
+(dataset changed during compute) is discarded instead of published (F11).
 
 Dash 4.5 return convention (source-verified in dash/_callback.py,
 ``_prepare_response``): a callback registered with a single Output receives
@@ -29,6 +31,7 @@ import json
 import math
 import re
 import struct
+import threading
 import zipfile
 import zlib
 from io import BytesIO
@@ -49,6 +52,7 @@ from ..processing import (
     spectrum_from_points,
     spectrum_from_roi,
 )
+from .results import ResultRecord, try_commit
 
 _COLORSCALES = ("Greys_r", "Viridis", "Plasma", "Hot", "Jet")
 _ACCENT = "#4196B4"  # legacy infn_lightblue
@@ -473,7 +477,10 @@ def build_app(cube=None):
     arr = _as_array(cube)
     state = {"cube": arr,
              "name": Path(getattr(cube, "path", "") or "cube").name,
-             "energy": getattr(cube, "energy", None)}
+             "energy": getattr(cube, "energy", None),
+             "revision": 0,   # server-side dataset revision (F11)
+             "result": None}  # committed ResultRecord, or None
+    state_lock = threading.Lock()  # guards revision bump and result commit
     H, W, C = arr.shape if arr is not None else (0, 0, 0)
     app = _XrfDash(__name__, external_stylesheets=[dbc.themes.DARKLY])
     app.layout = dbc.Container(fluid=True, children=[
@@ -890,8 +897,12 @@ def build_app(cube=None):
                    Output("elemental-msg", "children", allow_duplicate=True)],
                   Input("cal-store", "data"), prevent_initial_call=True)
     def _invalidate_elemental_maps(_calibration):
-        state["elemental_maps"] = []
-        state["elemental_spectrum"] = None
+        # A calibration change invalidates the current result (computed
+        # with the old m/q); bumping the revision also rejects any
+        # in-flight compute (F11).
+        with state_lock:
+            state["revision"] += 1
+            state["result"] = None
         return [], 0, ""
 
     @app.callback([Output("elemental-meta", "data", allow_duplicate=True),
@@ -910,6 +921,9 @@ def build_app(cube=None):
             return no_update, "Apply calibration first", no_update
         if len(rows or []) != len(widths or []):
             return no_update, "Each selected line needs a width", no_update
+        # Dataset identity at Compute start; the result is committed only
+        # if it is still current (F11).
+        revision, source_file = state["revision"], state["name"]
         maps, metadata = [], []
         full_spectrum = spectrum_from_roi(c, 0, c.shape[0], 0, c.shape[1])
         try:
@@ -932,7 +946,7 @@ def build_app(cube=None):
                 weights = np.where(np.isfinite(zone_spectrum), zone_spectrum, 0.0)
                 count_sum = float(weights.sum())
                 metadata.append({"label": line["element"], "line_name": line["element"],
-                                 "source_file": state["name"],
+                                 "source_file": source_file,
                                  "energy": line["value"], "line_centre_keV": line["value"],
                                  "integration_width_keV": integration_width,
                                  "integration_zone_keV": zone,
@@ -944,8 +958,13 @@ def build_app(cube=None):
                                  "minimum": float(finite.min()), "maximum": float(finite.max())})
         except (KeyError, IndexError, TypeError, ValueError) as error:
             return no_update, str(error), no_update
-        state["elemental_maps"] = maps
-        state["elemental_spectrum"] = full_spectrum
+        record = ResultRecord(revision=revision, source_file=source_file,
+                              cube_shape=tuple(c.shape), calibration=dict(calibration),
+                              metadata=metadata, maps=maps, spectrum=full_spectrum)
+        if not try_commit(state, state_lock, record):
+            # The dataset changed while we computed: never publish a stale
+            # result (F11).
+            return no_update, "Dataset changed during compute — run Compute again", no_update
         return metadata, f"Computed {len(maps)} full-field elemental maps", 0
 
     @app.callback(Output("elemental-index", "data", allow_duplicate=True),
@@ -969,8 +988,8 @@ def build_app(cube=None):
                   Input("elemental-shared-scale", "value"),
                   Input("colorscale", "value"), Input("log", "value"))
     def _elemental_figure(meta, index, shared, colorscale, log):
-        maps = state.get("elemental_maps", [])
-        if not meta or not maps:
+        record = state.get("result")
+        if not meta or record is None:
             return _empty_figure("Apply calibration, add lines, then Compute")
         index = min(int(index or 0), len(meta) - 1)
         current = meta[index]
@@ -983,19 +1002,19 @@ def build_app(cube=None):
                  f"{current['integration_width_keV']:g} keV — range {current['minimum']:g}–"
                  f"{current['maximum']:g} counts; scale {low:g}–{high:g} counts"
                  f"{' (log1p)' if log and 'log' in log else ''}")
-        return _elemental_map_figure(maps[index], title, low, high,
+        return _elemental_map_figure(record.maps[index], title, low, high,
                                      colorscale, bool(log and "log" in log))
 
     @app.callback(Output("elemental-spectrum", "figure"),
                   Input("elemental-meta", "data"), Input("elemental-index", "data"),
-                  Input("cal-store", "data"), Input("log", "value"))
-    def _elemental_spectrum(meta, index, calibration, log):
-        spectrum = state.get("elemental_spectrum")
-        if not meta or spectrum is None or not calibration:
+                  Input("log", "value"))
+    def _elemental_spectrum(meta, index, log):
+        record = state.get("result")
+        if not meta or record is None:
             return _empty_figure("Spectrum appears after Compute")
         index = min(int(index or 0), len(meta) - 1)
-        return _elemental_spectrum_figure(spectrum, calibration, meta[index],
-                                          bool(log and "log" in log))
+        return _elemental_spectrum_figure(record.spectrum, record.calibration,
+                                          meta[index], bool(log and "log" in log))
 
     @app.callback([Output("elemental-download-data", "data"),
                    Output("elemental-msg", "children", allow_duplicate=True)],
@@ -1003,12 +1022,13 @@ def build_app(cube=None):
                   State("elemental-meta", "data"),
                   State("elemental-shared-scale", "value"),
                   State("colorscale", "value"), State("log", "value"),
-                  State("cal-store", "data"),
                   prevent_initial_call=True)
-    def _download_elemental_maps(_n, meta, shared, colorscale, log, calibration):
-        maps = state.get("elemental_maps", [])
-        if not meta or not maps or not calibration:
+    def _download_elemental_maps(_n, meta, shared, colorscale, log):
+        record = state.get("result")
+        if not meta or record is None:
             return no_update, "Compute maps first"
+        maps = record.maps
+        calibration = record.calibration
         shared_range = (min(item["minimum"] for item in meta),
                         max(item["maximum"] for item in meta))
         archive = BytesIO()
@@ -1025,7 +1045,7 @@ def build_app(cube=None):
                     image, colorscale or "Greys_r", low, high,
                     bool(log and "log" in log)))
                 bundle.writestr(spectrum_filename, _spectrum_svg_bytes(
-                    state["elemental_spectrum"], calibration, item,
+                    record.spectrum, calibration, item,
                     bool(log and "log" in log)))
                 manifest.append({
                     "file": filename, "spectrum_file": spectrum_filename,
@@ -1041,7 +1061,7 @@ def build_app(cube=None):
                     "spectrum_centroid_keV": item["spectrum_centroid_keV"],
                     "calibration_keV_per_channel": calibration["m"],
                     "calibration_intercept_keV": calibration["q"],
-                    "cube_shape": list(state["cube"].shape),
+                    "cube_shape": list(record.cube_shape),
                     "spatial_scope": "full field",
                     "scale_mode": "shared" if "shared" in (shared or []) else "per-line autoscale",
                     "colorscale": colorscale or "Greys_r", "log1p": bool(log and "log" in log),
@@ -1261,9 +1281,11 @@ def build_app(cube=None):
         callbacks to recompute.
         """
         if ctx.triggered_id == "change-file":
-            state["cube"], state["name"] = None, ""
-            state["energy"] = None
-            state["elemental_maps"], state["elemental_spectrum"] = [], None
+            with state_lock:
+                state["cube"], state["name"] = None, ""
+                state["energy"] = None
+                state["revision"] += 1
+                state["result"] = None
             return _commit_load(None, "", gen)
         if ctx.triggered_id == "load-url":
             if not (url and url.strip()):
@@ -1282,9 +1304,11 @@ def build_app(cube=None):
             arr, name = cube.array, Path(filename or "cube").name
         else:
             return (no_update,) * 26
-        state["cube"], state["name"] = arr, name
-        state["energy"] = cube.energy
-        state["elemental_maps"], state["elemental_spectrum"] = [], None
+        with state_lock:
+            state["cube"], state["name"] = arr, name
+            state["energy"] = cube.energy
+            state["revision"] += 1
+            state["result"] = None
         return _commit_load(arr, name, gen, cube)
 
     return app

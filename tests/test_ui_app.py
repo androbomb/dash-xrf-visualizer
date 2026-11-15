@@ -425,14 +425,14 @@ def test_elemental_gallery_full_field_scale_and_zip(cube):
                                     if any(item.component_id == "elemental-spectrum"
                                            for item in (spec["output"] if isinstance(spec["output"], list)
                                                         else [spec["output"]])))
-    spectrum_fig = spectrum_figure_callback(metadata, 0, calibration, [])
+    spectrum_fig = spectrum_figure_callback(metadata, 0, [])
     assert spectrum_fig.layout.title.text.startswith("Full-field spectrum — Al (Ka)")
     assert spectrum_fig.layout.xaxis.title.text == "Energy (keV)"
     assert spectrum_fig.layout.shapes[0].type == "rect"
 
     download = next(spec["callback"].__wrapped__ for spec in app.callback_map.values()
                     if any(item["id"] == "elemental-download" for item in spec["inputs"]))
-    data, status = download(1, metadata, ["shared"], "Hot", [], calibration)
+    data, status = download(1, metadata, ["shared"], "Hot", [])
     assert status == "Downloaded 2 maps and spectra"
     with ZipFile(BytesIO(base64.b64decode(data["content"]))) as archive:
         assert len(archive.namelist()) == 5
@@ -455,6 +455,33 @@ def test_elemental_gallery_full_field_scale_and_zip(cube):
         assert manifest[0]["min_count"] == pytest.approx(min(m["minimum"] for m in metadata))
         assert manifest[0]["line_centre_keV"] == pytest.approx(1.486)
         assert manifest[0]["integration_zone_keV"] == pytest.approx([1.386, 1.586])
+
+
+def test_change_file_clears_elemental_results(cube):
+    # F11: results belong to a dataset revision; Change file discards them,
+    # so no stale map/spectrum survives until a new Compute.
+    app = build_app(cube)
+    from xrf_visualizer.ui.app import _XRF_LINES as lines
+    rows = [{"line_id": i, "width": 0.2} for i, line in enumerate(lines)
+            if line["element"].startswith("Al (Ka)")][:1]
+    calibration = {"m": 0.01, "q": 0.0}
+    compute = next(spec["callback"].__wrapped__ for spec in app.callback_map.values()
+                   if any(item["id"] == "elemental-compute" for item in spec["inputs"]))
+    metadata, _message, _index = compute(1, rows, [0.2], calibration)
+    assert len(metadata) == 1
+    figure = _cb(app, "elemental-map.figure")
+    fig = figure(metadata, 0, [], "Hot", [])
+    assert fig.data[0].z is not None
+    download = next(spec["callback"].__wrapped__ for spec in app.callback_map.values()
+                    if any(item["id"] == "elemental-download" for item in spec["inputs"]))
+    _data, status = download(1, metadata, [], "Hot", [])
+    assert status.startswith("Downloaded")
+    out = _load_via_http(app, "change-file.n_clicks", {"change-file.n_clicks": 1}, {"gen.data": 1})
+    assert "cleared" in out[0]
+    empty_fig = figure(metadata, 0, [], "Hot", [])
+    assert empty_fig.layout.annotations[0]["text"] == ("Apply calibration, add lines, then Compute")
+    _data, status = download(1, metadata, [], "Hot", [])
+    assert status == "Compute maps first"
 
 
 def test_elemental_map_requires_calibration_and_width_is_float():
