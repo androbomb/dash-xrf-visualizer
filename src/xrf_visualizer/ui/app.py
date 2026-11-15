@@ -42,7 +42,7 @@ import plotly.graph_objects as go
 from plotly.colors import sample_colorscale
 from dash import ALL, Dash, Input, Output, State, ctx, dcc, html, no_update
 
-from ..data import download_cube, load_cube_bytes, load_xrf_lines
+from ..data import download_cube, load_cube_bytes, load_xrf_lines, validate_cube_array
 from ..processing import (
     calibrate,
     map_from_channels,
@@ -366,10 +366,12 @@ def _as_array(cube):
     if cube is None:
         return None
     if isinstance(cube, np.ndarray):
-        return cube
-    arr = getattr(cube, "array", None)
-    if arr is None:
-        raise TypeError(f"cube must be an XrfCube or ndarray, got {type(cube).__name__}")
+        arr = cube
+    else:
+        arr = getattr(cube, "array", None)
+        if arr is None:
+            raise TypeError(f"cube must be an XrfCube or ndarray, got {type(cube).__name__}")
+    validate_cube_array(arr, "cube")
     return arr
 
 
@@ -960,7 +962,8 @@ def build_app(cube=None):
             return no_update, str(e)
 
     @app.callback([Output("points-store", "data"), Output("msg", "children"),
-                   Output("roi-store", "data"), Output("ch-store", "data")],
+                   Output("roi-store", "data", allow_duplicate=True),
+                   Output("ch-store", "data", allow_duplicate=True)],
                   Input("apply-points", "n_clicks"), Input("clear", "n_clicks"),
                   State("pt-rows", "value"), State("pt-cols", "value"),
                   prevent_initial_call=True)
@@ -1064,55 +1067,82 @@ def build_app(cube=None):
         return {"zmin": zmin, "zmax": zmax}, zmin, zmax
 
     # --- M6: file loading (upload / link / change) ---------------------------
+    def _commit_load(arr, name, gen):
+        """One commit block for load and clear (audit 1, 19). The new dataset
+        owns all selections, so no stale ROI, channels, points, scale or
+        calibration state survives a load (audit 2)."""
+        h, w, c = arr.shape if arr is not None else (0, 0, 0)
+        if arr is None:
+            msg, cname = "Cube cleared — upload a file or paste a link.", "— no cube loaded"
+        else:
+            msg, cname = (f"Loaded {name} — {h} x {w} x {c}",
+                          f"— {name} ({h} x {w} x {c})")
+        return (msg, cname, (gen or 0) + 1,
+                None, None,
+                None, [], 0,
+                [0, h, 0, w], [0, c], [],
+                {"zmin": None, "zmax": None},
+                0, h, 0, w, 0, c,
+                [], [], None, None, "", "")
+
     @app.callback([Output("load-msg", "children"), Output("cube-name", "children"),
-                   Output("zmin", "value"), Output("zmax", "value"),
-                   Output("gen", "data"), Output("cal-store", "data", allow_duplicate=True),
+                   Output("gen", "data"),
+                   Output("zmin", "value", allow_duplicate=True),
+                   Output("zmax", "value", allow_duplicate=True),
+                   Output("cal-store", "data", allow_duplicate=True),
                    Output("elemental-meta", "data", allow_duplicate=True),
-                   Output("elemental-index", "data", allow_duplicate=True)],
+                   Output("elemental-index", "data", allow_duplicate=True),
+                   Output("roi-store", "data", allow_duplicate=True),
+                   Output("ch-store", "data", allow_duplicate=True),
+                   Output("points-store", "data", allow_duplicate=True),
+                   Output("scale-store", "data", allow_duplicate=True),
+                   Output("roi-y0", "value"), Output("roi-y1", "value"),
+                   Output("roi-x0", "value"), Output("roi-x1", "value"),
+                   Output("ch-s", "value"), Output("ch-e", "value"),
+                   Output("cal-points-store", "data", allow_duplicate=True),
+                   Output("cal-point-rows", "children", allow_duplicate=True),
+                   Output("cal-point-x", "value", allow_duplicate=True),
+                   Output("cal-point-y", "value", allow_duplicate=True),
+                   Output("cal-point-msg", "children", allow_duplicate=True),
+                   Output("cal-msg", "children", allow_duplicate=True)],
                   Input("upload", "contents"), State("upload", "filename"),
                   Input("load-url", "n_clicks"), State("url", "value"),
                   Input("change-file", "n_clicks"),
                   State("gen", "data"),
                   prevent_initial_call=True)
     def _on_load(contents, filename, n_url, url, n_change, gen):
-        """Single entry point for file loading (M6). Priority: change > link >
-        upload. On error the cube state is untouched. The gen bump forces the
-        figure callbacks to recompute (selection stores may be stale)."""
-        if n_change:
+        """Single entry point for file loading (M6).
+
+        Dispatch on ctx.triggered_id, not on the n_clicks counters: they are
+        cumulative, so the first Change file discarded every later upload and
+        a stale URL click re-downloaded over a new upload (audit 1). On
+        success the dataset is committed in one block (audit 2, 19); on error
+        the current dataset is untouched. The gen bump forces the figure
+        callbacks to recompute.
+        """
+        if ctx.triggered_id == "change-file":
             state["cube"], state["name"] = None, ""
-            state["elemental_maps"] = []
-            state["elemental_spectrum"] = None
-            return ("Cube cleared — upload a file or paste a link.",
-                    "— no cube loaded", None, None, (gen or 0) + 1, None, [], 0)
-        if n_url and url and url.strip():
+            state["elemental_maps"], state["elemental_spectrum"] = [], None
+            return _commit_load(None, "", gen)
+        if ctx.triggered_id == "load-url":
+            if not (url and url.strip()):
+                return ("Enter a URL first",) + (no_update,) * 23
             try:
                 cube = download_cube(url.strip())
             except Exception as e:
-                return (f"Download failed: {e}", no_update, no_update, no_update,
-                        no_update, no_update, no_update, no_update)
-            state["cube"], state["name"] = cube.array, cube.path.name
-            state["elemental_maps"] = []
-            state["elemental_spectrum"] = None
-            h, w, c_ = cube.array.shape
-            return (f"Loaded {cube.path.name} — {h} x {w} x {c_}",
-                    f"— {cube.path.name} ({h} x {w} x {c_})",
-                    None, None, (gen or 0) + 1, None, [], 0)
-        if contents:
+                return (f"Download failed: {e}",) + (no_update,) * 23
+            arr, name = cube.array, cube.path.name
+        elif contents:
             try:
                 _, b64 = contents.split(",", 1)
-                data = base64.b64decode(b64)
-                cube = load_cube_bytes(data, filename or "")
+                cube = load_cube_bytes(base64.b64decode(b64), filename or "")
             except Exception as e:
-                return (f"Upload failed: {e}", no_update, no_update, no_update,
-                        no_update, no_update, no_update, no_update)
-            state["cube"], state["name"] = cube.array, Path(filename or "cube").name
-            state["elemental_maps"] = []
-            state["elemental_spectrum"] = None
-            h, w, c_ = cube.array.shape
-            return (f"Loaded {state['name']} — {h} x {w} x {c_}",
-                    f"— {state['name']} ({h} x {w} x {c_})",
-                    None, None, (gen or 0) + 1, None, [], 0)
-        return (no_update, no_update, no_update, no_update, no_update,
-                no_update, no_update, no_update)
+                return (f"Upload failed: {e}",) + (no_update,) * 23
+            arr, name = cube.array, Path(filename or "cube").name
+        else:
+            return (no_update,) * 24
+        state["cube"], state["name"] = arr, name
+        state["elemental_maps"], state["elemental_spectrum"] = [], None
+        return _commit_load(arr, name, gen)
 
     return app

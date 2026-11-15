@@ -662,38 +662,136 @@ def test_build_app_empty():
     assert not f.data
 
 
+def test_build_app_rejects_empty_axes():
+    # F13: validation at the UI entry point, not only in the readers
+    with pytest.raises(ValueError, match="positive"):
+        build_app(np.zeros((0, 5, 6), dtype=np.float32))
+
+
+def _load_via_http(app, trigger, inputs=None, states=None):
+    # ctx.triggered_id only exists inside a request, so _on_load is driven
+    # through the dash endpoint, not the raw callable.
+    key = next(k for k in app.callback_map if "load-msg" in k)
+    return _http_callback(app, key, inputs or {}, states or {}, trigger)
+
+
 def test_on_load_upload(empty_app, cube):
-    cb = _cb(empty_app, "load-msg")
     payload = "data:application/octet-stream;base64," + base64.b64encode(NPZ.read_bytes()).decode()
-    out = cb(payload, "synthetic_cube.npz", 0, "", 0, 0)
+    out = _load_via_http(empty_app, "upload.contents",
+                         inputs={"upload.contents": payload},
+                         states={"upload.filename": "synthetic_cube.npz"})
     assert "Loaded synthetic_cube.npz" in out[0]
-    assert out[4] == 1  # gen bumped
+    assert out[2] == 1  # gen bumped
+    # F2: a load commits full-range ROI/channels, empty points and auto scale
+    assert out[8] == [0, H, 0, W] and out[9] == [0, C]
+    assert out[10] == [] and out[11] == {"zmin": None, "zmax": None}
     # map figure now matches the processing layer for the full channel range
-    m = _cb(empty_app, "map.figure")([0, C], [0, H, 0, W], [], "Viridis", [],
-                                      {"zmin": None, "zmax": None}, None, 1)
-    z = np.asarray(m.data[0]["z"])
+    m = _http_callback(empty_app, "map.figure",
+        {"ch-store.data": [0, C], "roi-store.data": [0, H, 0, W], "points-store.data": [],
+         "apply-scale.n_clicks": 0, "apply-calibration.n_clicks": 0, "gen.data": 1},
+        {"m.value": None, "q.value": None, "zmin.value": None, "zmax.value": None,
+         "colorscale.value": "Viridis", "log.value": []}, "gen.data")
     from xrf_visualizer.processing import map_from_channels
-    np.testing.assert_array_equal(z, map_from_channels(cube, 0, C))
+    np.testing.assert_array_equal(_plotly_array(m["data"][0]["z"]),
+                                  map_from_channels(cube, 0, C))
 
 
 def test_on_load_upload_bad_bytes(empty_app, cube):
-    from dash import no_update
-    cb = _cb(empty_app, "load-msg")
     payload = "data:application/octet-stream;base64," + base64.b64encode(b"not a cube").decode()
-    out = cb(payload, "junk.npz", 0, "", 0, 0)
+    out = _load_via_http(empty_app, "upload.contents",
+                         inputs={"upload.contents": payload},
+                         states={"upload.filename": "junk.npz"})
     assert out[0].startswith("Upload failed")
-    assert out[4] is no_update
+    assert out[2] is None  # gen untouched
     # state untouched: figures still empty
-    m = _cb(empty_app, "map.figure")([0, C], [0, H, 0, W], [], "Viridis", [],
-                                      {"zmin": None, "zmax": None}, None, 0)
-    assert not m.data
+    m = _http_callback(empty_app, "map.figure",
+        {"ch-store.data": [0, C], "roi-store.data": [0, H, 0, W], "points-store.data": [],
+         "apply-scale.n_clicks": 0, "apply-calibration.n_clicks": 0, "gen.data": 0},
+        {"m.value": None, "q.value": None, "zmin.value": None, "zmax.value": None,
+         "colorscale.value": "Viridis", "log.value": []}, "gen.data")
+    assert not m["data"]
 
 
 def test_on_load_change(empty_app):
-    cb = _cb(empty_app, "load-msg")
-    out = cb(None, None, 0, "", 1, 3)
-    assert "Cube cleared" in out[0]
-    assert out[4] == 4
+    cleared = _load_via_http(empty_app, "change-file.n_clicks",
+                             inputs={"change-file.n_clicks": 1},
+                             states={"gen.data": 3})
+    assert "Cube cleared" in cleared[0]
+    assert cleared[2] == 4
+    # F2: clear commits empty stores and controls
+    assert cleared[8] == [0, 0, 0, 0] and cleared[9] == [0, 0]
+    assert cleared[10] == [] and cleared[11] == {"zmin": None, "zmax": None}
+    assert cleared[18] == [] and cleared[22] == "" and cleared[23] == ""
+
+
+def test_on_load_dispatches_on_triggered_input_not_counters(empty_app, http_server):
+    # F1: the n_clicks counters are cumulative; the old code branched on them,
+    # so after one Change-file or URL click every later upload was discarded
+    # or overwritten. Dispatch must follow ctx.triggered_id.
+    payload = "data:application/octet-stream;base64," + base64.b64encode(NPZ.read_bytes()).decode()
+    out = _load_via_http(empty_app, "upload.contents",
+                         inputs={"upload.contents": payload},
+                         states={"upload.filename": "synthetic_cube.npz"})
+    assert "Loaded synthetic_cube.npz" in out[0]
+
+    cleared = _load_via_http(empty_app, "change-file.n_clicks",
+                             inputs={"change-file.n_clicks": 1},
+                             states={"gen.data": 1})
+    assert "Cube cleared" in cleared[0]
+    assert cleared[2] == 2
+
+    # the next upload still loads even though change-file.n_clicks is 1
+    reupload = _load_via_http(empty_app, "upload.contents",
+                              inputs={"upload.contents": payload, "change-file.n_clicks": 1},
+                              states={"upload.filename": "synthetic_cube.npz", "gen.data": 2})
+    assert "Loaded synthetic_cube.npz" in reupload[0]
+    assert reupload[2] == 3
+
+    small = np.zeros((8, 16, 100), dtype=np.float32)
+    buf = BytesIO()
+    np.savez(buf, img=small)
+    small_payload = "data:application/octet-stream;base64," + base64.b64encode(buf.getvalue()).decode()
+    # a stale URL click + URL must not override a fresh upload
+    fresh = _load_via_http(empty_app, "upload.contents",
+                           inputs={"upload.contents": small_payload, "load-url.n_clicks": 1,
+                                   "change-file.n_clicks": 1},
+                           states={"upload.filename": "small.npz", "gen.data": 3,
+                                   "url.value": f"{http_server}/synthetic_cube.npz"})
+    assert "Loaded small.npz" in fresh[0]
+
+
+def test_on_load_replaces_stale_selections(cube):
+    # F2: on load the new dataset owns all selections; a stale ROI, channels,
+    # points, scale and calibration points must not survive.
+    app = build_app(cube)
+    _http_callback(app, "roi-store.data",
+        {"map.relayoutData": {"xaxis.range[0]": 10.2, "xaxis.range[1]": 20.8,
+                              "yaxis.range[0]": 4.1, "yaxis.range[1]": 9.7},
+         "apply-roi.n_clicks": 0},
+        {"roi-store.data": [0, H, 0, W], "roi-y0.value": 0, "roi-y1.value": H,
+         "roi-x0.value": 0, "roi-x1.value": W}, "map.relayoutData")
+
+    small = np.zeros((8, 16, 100), dtype=np.float32)
+    buf = BytesIO()
+    np.savez(buf, img=small)
+    payload = "data:application/octet-stream;base64," + base64.b64encode(buf.getvalue()).decode()
+    out = _load_via_http(app, "upload.contents",
+                         inputs={"upload.contents": payload},
+                         states={"upload.filename": "small.npz", "gen.data": 0})
+    assert out[0] == "Loaded small.npz — 8 x 16 x 100"
+    assert out[8] == [0, 8, 0, 16]  # full new range, not the stale [4, 10, 10, 21]
+    assert out[9] == [0, 100]
+    assert out[10] == [] and out[11] == {"zmin": None, "zmax": None}
+    assert out[18] == [] and out[20] is None and out[21] is None
+    assert out[22] == "" and out[23] == ""
+    # state is committed: the map figure now renders the new cube
+    fig = _http_callback(app, "map.figure",
+        {"ch-store.data": [0, 100], "roi-store.data": [0, 8, 0, 16],
+         "points-store.data": [], "apply-scale.n_clicks": 0,
+         "apply-calibration.n_clicks": 0, "gen.data": 1},
+        {"m.value": None, "q.value": None, "zmin.value": None, "zmax.value": None,
+         "colorscale.value": "Viridis", "log.value": []}, "gen.data")
+    assert _plotly_array(fig["data"][0]["z"]).shape == (8, 16)
 
 
 @pytest.fixture
@@ -707,8 +805,11 @@ def http_server():
 
 
 def test_on_load_link(empty_app, cube, http_server):
-    cb = _cb(empty_app, "load-msg")
-    out = cb(None, None, 1, f"{http_server}/synthetic_cube.npz", 0, 0)
+    out = _load_via_http(empty_app, "load-url.n_clicks",
+                         inputs={"load-url.n_clicks": 1},
+                         states={"url.value": f"{http_server}/synthetic_cube.npz"})
     assert "Loaded synthetic_cube.npz" in out[0]
-    out2 = cb(None, None, 1, "ftp://nope", 0, 0)
+    out2 = _load_via_http(empty_app, "load-url.n_clicks",
+                          inputs={"load-url.n_clicks": 1},
+                          states={"url.value": "ftp://nope"})
     assert out2[0].startswith("Download failed")

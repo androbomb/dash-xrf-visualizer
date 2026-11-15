@@ -39,6 +39,8 @@ windows-env/
 # Optional LaTeX output
 /notes/build/
 
+# addendum
+audit/
 # Do NOT ignore pyproject.toml or uv.lock: lock file must be versioned.
 # Do NOT globally ignore .h5/.hdf5/.npy/.npz: allow small reviewed tests/fixtures.
 # Check whether legacy files are already tracked: .gitignore alone will not untrack.

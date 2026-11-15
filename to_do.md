@@ -1,7 +1,17 @@
 # XRF-only visualizer — project to-do
 
 > Future requirements are user decisions, not verified legacy implementation.
-> M0–M25 completed 2026-11-10/13 (evidence in `timeline.md`).
+> M0–M28 completed 2026-11-10/13 (evidence in `timeline.md`); PyPI `xrf-visualizer 0.1.0` published 2026-11-15 (tag `v0.1.0`).
+
+## Audit bug fixes (Codex audit `audit/`, approved 2026-11-15) — in progress
+
+Six steps, sync + commit after each step. **No pushes or new publishes during
+the fix phase** (user constraint). F-labels refer to `audit/audit_codex.md`.
+
+- [x] **Step 1** (2026-11-15) — F1 load dispatch on `ctx.triggered_id` (old code branched on cumulative `n_clicks` counters: after one Change-file/URL click every later upload was discarded or overwritten); F2 single commit block for load and clear (24 outputs: message, cube name, gen, ROI/ch/points stores, numeric fields, scale, empty calibration — no stale selection survives); F13 public `validate_cube_array` on all reader paths (zero-length axes / non-3-D cubes → ValueError, not IndexError/accepted); F14 filename from `Content-Disposition` via `get_filename()` (RFC 5987), not the URL path; F8 `allow_duplicate=True` only on the secondary Output writers. Evidence: 73 passed, 1 skipped (GPU).
+- [ ] **Steps 2–4** (one sync per step) — F3 ROI clamp off-by-one at the edges; F4 `build_app(XrfCube)` uses the channel axis while a stored energy axis exists; F5 `_line_channel_range` inclusive upper bound (off-by-one channel); F6 spectrum selection round-trip off-by-one after calibration; F7 PNG export crop semantics vs README promise (a test currently pins the opposite behavior — decide which is correct).
+- [ ] **Step 5** — F9, F10, F17–F19 (deploy/publish). F10 code-side URL destination restriction awaits a separate user decision.
+- [ ] **Step 6** — F15 reduction cache; F16 GPU device reporting (possible false positive: JAX CUDA devices report `platform="cuda"`, not `"gpu"` — verify before changing).
 
 ## Now — M1 baseline + approved docs (completed 2026-11-10)
 
@@ -46,11 +56,10 @@
 
 ## Later — remaining release/maintenance work
 
-- [ ] PyPI release: recheck `xrf-visualizer` availability, confirm license
-  copyright holder, run the new CI on GitHub, rehearse the artifact on
-  TestPyPI, configure GitHub Trusted Publishing (`androbomb` /
-  `dash-xrf-visualizer` / `publish.yml` / `pypi`), then manually publish a
-  reviewed version tag. Guide: `deploy/how_to_deploy_pip.md`.
+- [x] PyPI release: `xrf-visualizer 0.1.0` published 2026-11-15 (tag `v0.1.0`,
+  TestPyPI rehearsal done, Trusted Publishing configured, CI green run on
+  GitHub). Guide: `deploy/how_to_deploy_pip.md`.
+- [ ] After the audit fix phase: publish the next reviewed version tag (post-0.1.0).
 
 - [ ] Drag-mode select on the map (deferred by user 2026-11-11): plotly drag-mode selection in addition to zoom = selection; zoom + numeric ROI panel cover the need for now.
 - [ ] Ask user to manually test Docker and Apptainer; WSLC was reported working by the user. Document results without claiming unverified container tests.

@@ -16,7 +16,6 @@ import os
 import tempfile
 import urllib.request
 from dataclasses import dataclass
-from email.parser import BytesParser
 from pathlib import Path
 from urllib.parse import unquote, urlparse
 
@@ -29,6 +28,7 @@ __all__ = [
     "load_cube_bytes",
     "download_cube",
     "sniff_format",
+    "validate_cube_array",
     "load_xrf_lines",
 ]
 
@@ -48,11 +48,16 @@ class XrfCube:
     energy: np.ndarray | None  # (C,) float64 keV, or None = channel (ADC) axis
 
 
-def _validate_array(arr: np.ndarray, path: Path) -> None:
+def validate_cube_array(arr: np.ndarray, label: str) -> None:
+    """3-D floating cube with strictly positive axes; ValueError otherwise.
+    Shape is checked before anything indexed by shape (e.g. the energy axis),
+    so a scalar 'img' fails with ValueError, not IndexError."""
     if arr.ndim != 3:
-        raise ValueError(f"{path.name}: expected a 3-D array (H, W, C), got shape {arr.shape}")
+        raise ValueError(f"{label}: expected a 3-D array (H, W, C), got shape {arr.shape}")
+    if any(size == 0 for size in arr.shape):
+        raise ValueError(f"{label}: all axes must be positive, got shape {arr.shape}")
     if not np.issubdtype(arr.dtype, np.floating):
-        raise ValueError(f"{path.name}: expected a floating dtype (counts), got {arr.dtype}")
+        raise ValueError(f"{label}: expected a floating dtype (counts), got {arr.dtype}")
 
 
 def _validate_energy(energy: np.ndarray, n_channels: int, path: Path) -> np.ndarray:
@@ -77,13 +82,14 @@ def load_cube(path: str | Path) -> XrfCube:
             if "img" not in z:
                 raise ValueError(f"{p.name}: missing 'img' key (found: {sorted(z.files)})")
             arr = z["img"]
+            # validate shape/axes before touching arr.shape[-1] (scalar img)
+            validate_cube_array(arr, p.name)
             energy = _validate_energy(z["energy"], arr.shape[-1], p) if "energy" in z else None
-        _validate_array(arr, p)
         return XrfCube(p, arr, energy)
 
     if suffix == ".npy":
         arr = np.load(p, allow_pickle=False)
-        _validate_array(arr, p)
+        validate_cube_array(arr, p.name)
         return XrfCube(p, arr, None)
 
     if suffix in (".h5", ".hdf5"):
@@ -94,7 +100,7 @@ def load_cube(path: str | Path) -> XrfCube:
             if not isinstance(ds, h5py.Dataset):
                 raise ValueError(f"{p.name}: 'img' must be a dataset, found {type(ds).__name__}")
             arr = np.asarray(ds[...])
-        _validate_array(arr, p)
+        validate_cube_array(arr, p.name)
         return XrfCube(p, arr, None)
 
     raise ValueError(f"unsupported XRF file: {p.name} (expected .h5, .hdf5, .npz or .npy)")
@@ -133,12 +139,12 @@ def load_cube_bytes(data: bytes, name: str = "") -> XrfCube:
 
 
 def _name_from_response(headers, url: str) -> str:
-    cd = headers.get("Content-Disposition")
-    if cd:
-        msg = BytesParser().parsebytes(cd.encode())
-        name = msg.get_filename()
-        if name:
-            return name
+    # response headers are an email.message: get_filename() handles both
+    # filename and RFC 5987 filename*; parsing the raw header line parsed
+    # nothing and the name was always lost to the URL fallback.
+    name = headers.get_filename()
+    if name:
+        return name
     return Path(unquote(urlparse(url).path)).name or ""
 
 

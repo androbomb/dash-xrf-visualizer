@@ -1,12 +1,15 @@
 """Reader tests: fixtures round-trip, schema validation, XRFlines, real data_example metadata."""
+import http.server
+import socketserver
 import subprocess
 import sys
+import threading
 from pathlib import Path
 
 import numpy as np
 import pytest
 
-from xrf_visualizer.data import XrfCube, load_cube, load_xrf_lines
+from xrf_visualizer.data import XrfCube, download_cube, load_cube, load_xrf_lines
 
 FIXTURES = Path(__file__).parent / "fixtures"
 DATA_EXAMPLE = Path(__file__).parent.parent / "data_example"
@@ -54,6 +57,11 @@ CASES = [
         "strictly increasing",
     ),
     ("bad.txt", lambda p: p.write_text("not a cube"), "unsupported XRF file"),
+    # F13: zero-length axes and non-3-D cubes must fail with ValueError
+    ("bad.npy", lambda p: np.save(p, np.zeros((0, 5, 6), np.float32)), "positive"),
+    ("bad.npy", lambda p: np.save(p, np.zeros((4, 5, 0), np.float32)), "positive"),
+    ("bad.npz", lambda p: np.savez(p, img=np.zeros((4, 5, 0), np.float32)), "positive"),
+    ("bad.npz", lambda p: np.savez(p, img=np.array(3.0), energy=np.array(1.0)), "3-D array"),
 ]
 
 
@@ -90,3 +98,29 @@ def test_real_example_metadata():
         assert cube.array.ndim == 3
         assert np.issubdtype(cube.array.dtype, np.floating)
         assert cube.energy is None  # no stored energy axis in the example files
+
+
+def test_download_cube_name_from_content_disposition():
+    # F14: the Content-Disposition filename must win over the URL path
+    payload = (FIXTURES / "synthetic_cube.npz").read_bytes()
+
+    class Handler(http.server.BaseHTTPRequestHandler):
+        def do_GET(self):
+            self.send_response(200)
+            self.send_header("Content-Disposition", 'attachment; filename="cube.npz"')
+            self.send_header("Content-Length", str(len(payload)))
+            self.end_headers()
+            self.wfile.write(payload)
+
+        def log_message(self, format, *args):
+            pass
+
+    httpd = socketserver.TCPServer(("127.0.0.1", 0), Handler)
+    threading.Thread(target=httpd.serve_forever, daemon=True).start()
+    try:
+        cube = download_cube(f"http://127.0.0.1:{httpd.server_address[1]}/download.php")
+        assert cube.path.name == "cube.npz"
+        assert cube.array.shape == (48, 64, C)
+    finally:
+        httpd.shutdown()
+        httpd.server_close()
