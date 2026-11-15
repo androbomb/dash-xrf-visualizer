@@ -24,13 +24,14 @@ step.
    apptainer build xrf-viz.sif deploy/apptainer/xrf-viz.def
    ```
 
-   (`xrf-viz.def` uses `Bootstrap: docker / From: xrf-viz:latest`.)
+   (`xrf-viz.def` uses `Bootstrap: docker-daemon / From: xrf-viz:latest` —
+   the image must exist in the local Docker daemon.)
 
 3. Run — with a preloaded cube (adjust the path and cube filename):
 
    ```bash
-   apptainer run --bind /home/<you>/xrf-data:/data \
-       -e XRF_CUBE=/data/Mantegna_mappa3b_centro-sx_35kV-90uA.npz \
+   apptainer run --bind /home/<you>/xrf-data:/data:ro \
+       --env XRF_CUBE=/data/Mantegna_mappa3b_centro-sx_35kV-90uA.npz \
        xrf-viz.sif
    ```
 

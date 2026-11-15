@@ -5,6 +5,7 @@ import socketserver
 import subprocess
 import sys
 import threading
+import urllib.request
 import zipfile
 from pathlib import Path
 
@@ -13,6 +14,7 @@ import pytest
 
 from xrf_visualizer.data import (
     XrfCube,
+    _SafeRedirectHandler,
     download_cube,
     load_cube,
     load_cube_bytes,
@@ -108,8 +110,10 @@ def test_real_example_metadata():
         assert cube.energy is None  # no stored energy axis in the example files
 
 
-def test_download_cube_name_from_content_disposition():
+def test_download_cube_name_from_content_disposition(monkeypatch):
     # F14: the Content-Disposition filename must win over the URL path
+    monkeypatch.setattr("xrf_visualizer.data._assert_public_url",
+                        lambda url: None)  # F10 gate tested separately
     payload = (FIXTURES / "synthetic_cube.npz").read_bytes()
 
     class Handler(http.server.BaseHTTPRequestHandler):
@@ -132,6 +136,28 @@ def test_download_cube_name_from_content_disposition():
     finally:
         httpd.shutdown()
         httpd.server_close()
+
+
+def test_download_cube_refuses_non_public_destinations():
+    # F10: the server-side fetch must not reach loopback/internal
+    # addresses, so it is refused before any request leaves the machine.
+    for url in ("http://127.0.0.1:8765/x.npz", "http://10.0.0.4/x.npz",
+                "http://192.168.1.10/x.npz", "http://localhost/x.npz"):
+        with pytest.raises(ValueError, match="non-public"):
+            download_cube(url)
+
+
+def test_download_redirect_to_non_public_is_rechecked():
+    # F10: a public URL must not be able to redirect the fetch to an
+    # internal address; every hop is re-checked.
+    handler = _SafeRedirectHandler()
+    req = urllib.request.Request("https://example.com/cube.npz")
+    with pytest.raises(ValueError, match="non-public"):
+        handler.redirect_request(req, None, 302, "Found", {},
+                                 "http://127.0.0.1/x.npz")
+    follow = handler.redirect_request(req, None, 302, "Found", {},
+                                      "https://example.com/files/cube.npz")
+    assert follow.full_url == "https://example.com/files/cube.npz"
 
 
 # F12: expanded-cube size limit, checked on file metadata before allocation.

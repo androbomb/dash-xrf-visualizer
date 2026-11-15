@@ -19,7 +19,7 @@ environment and fill the result log). CPU-only JAX: no GPU passthrough.
 2. Run — with a preloaded cube (adjust the path and cube filename):
 
    ```bash
-   docker run --rm -p 8765:8765 \
+   docker run --rm -p 127.0.0.1:8765:8765 \
        -v /home/<you>/xrf-data:/data:ro \
        -e XRF_CUBE=/data/Mantegna_mappa3b_centro-sx_35kV-90uA.npz \
        xrf-viz
@@ -29,7 +29,7 @@ environment and fill the result log). CPU-only JAX: no GPU passthrough.
    and you upload a file or paste a download link in the UI:
 
    ```bash
-   docker run --rm -p 8765:8765 xrf-viz
+   docker run --rm -p 127.0.0.1:8765:8765 xrf-viz
    ```
 
 3. Open `http://localhost:8765`. First request compiles the JAX reductions —

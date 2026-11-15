@@ -62,8 +62,14 @@ def test_download_cube_bad_url():
 
 
 @pytest.fixture
-def http_server():
-    """Serve the fixtures dir on 127.0.0.1:<ephemeral port>."""
+def http_server(monkeypatch):
+    """Serve the fixtures dir on 127.0.0.1:<ephemeral port>.
+
+    The F10 public-address gate is disabled here: these tests exercise the
+    transfer path; the gate itself is covered in tests/test_readers.py.
+    """
+    monkeypatch.setattr("xrf_visualizer.data._assert_public_url",
+                        lambda url: None)
     handler = partial(http.server.SimpleHTTPRequestHandler, directory=str(FIX))
     httpd = socketserver.TCPServer(("127.0.0.1", 0), handler)
     t = threading.Thread(target=httpd.serve_forever, daemon=True)

@@ -11,8 +11,10 @@ Readers never import Dash; numeric reductions live in ``processing`` (M3).
 """
 from __future__ import annotations
 
+import ipaddress
 import json
 import os
+import socket
 import tempfile
 import urllib.request
 import zipfile
@@ -187,6 +189,29 @@ def _name_from_response(headers, url: str) -> str:
     return Path(unquote(urlparse(url).path)).name or ""
 
 
+def _assert_public_url(url: str) -> None:
+    """Reject non-public destinations before the request is sent (F10):
+    the URL download is a server-side fetch, so a reachable instance must
+    not be usable to probe loopback or internal services."""
+    host = urlparse(url).hostname
+    if not host:
+        raise ValueError(f"URL has no host: {url[:50]!r}")
+    try:
+        infos = socket.getaddrinfo(host, None)
+    except socket.gaierror as e:
+        raise ValueError(f"cannot resolve host {host!r}") from e
+    if not any(ipaddress.ip_address(info[4][0]).is_global for info in infos):
+        raise ValueError(f"refusing to download from non-public address {host!r}")
+
+
+class _SafeRedirectHandler(urllib.request.HTTPRedirectHandler):
+    """Re-run the public-destination check on every redirect (F10)."""
+
+    def redirect_request(self, req, fp, code, msg, headers, newurl):
+        _assert_public_url(newurl)
+        return super().redirect_request(req, fp, code, msg, headers, newurl)
+
+
 def download_cube(url: str, max_bytes: int = 500 * 1024 * 1024,
                   timeout: float = 60.0) -> XrfCube:
     """Download an XRF cube from an http(s) URL and validate it as a cube.
@@ -197,8 +222,10 @@ def download_cube(url: str, max_bytes: int = 500 * 1024 * 1024,
     """
     if not url.lower().startswith(("http://", "https://")):
         raise ValueError(f"only http(s) URLs are supported, got {url[:50]!r}")
+    _assert_public_url(url)
     req = urllib.request.Request(url, headers={"User-Agent": "xrf-visualizer/0.1"})
-    with urllib.request.urlopen(req, timeout=timeout) as r:
+    opener = urllib.request.build_opener(_SafeRedirectHandler())
+    with opener.open(req, timeout=timeout) as r:
         name = _name_from_response(r.headers, url)
         data = r.read(max_bytes + 1)
     if len(data) > max_bytes:

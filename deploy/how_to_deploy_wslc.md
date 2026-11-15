@@ -22,7 +22,7 @@ form worked in a real user build. If your version differs, check
 2. Run — with a preloaded cube (adjust the path and cube filename):
 
    ```bash
-   wslc run --name dash-xrf-viewer -p 8765:8765 \
+   wslc run --name dash-xrf-viewer -p 127.0.0.1:8765:8765 \
        -v C:\Users\<you>\xrf-data:/data:ro \
        -e XRF_CUBE=/data/Mantegna_mappa3b_centro-sx_35kV-90uA.npz \
        xrf-viz
@@ -35,7 +35,7 @@ form worked in a real user build. If your version differs, check
    loaded" and you upload a file or paste a download link in the UI:
 
    ```bash
-   wslc run --name dash-xrf-viewer -p 8765:8765 xrf-viz
+   wslc run --name dash-xrf-viewer -p 127.0.0.1:8765:8765 xrf-viz
    ```
 
 3. Open `http://localhost:8765`. First request compiles the JAX reductions —

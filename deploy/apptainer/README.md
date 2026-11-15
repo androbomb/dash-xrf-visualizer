@@ -12,8 +12,8 @@ Run (bind the data directory, point `XRF_CUBE` at the mounted file —
 paste a download link in the UI):
 
 ```bash
-apptainer run --bind /abs/path/to/xrf/data:/data \
-    -e XRF_CUBE=/data/Mantegna_mappa3b_centro-sx_35kV-90uA.npz \
+apptainer run --bind /abs/path/to/xrf/data:/data:ro \
+    --env XRF_CUBE=/data/Mantegna_mappa3b_centro-sx_35kV-90uA.npz \
     xrf-viz.sif
 ```
 

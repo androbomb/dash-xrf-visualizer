@@ -12,7 +12,7 @@ Run (`XRF_CUBE` **optional**, M6 — without it the app starts empty and
 you upload a file or paste a download link in the UI):
 
 ```powershell
-wslc run --name dash-xrf-viewer -p 8765:8765 \
+wslc run --name dash-xrf-viewer -p 127.0.0.1:8765:8765 \
     -v C:\Users\<you>\xrf-data:/data:ro \
     -e XRF_CUBE=/data/Mantegna_mappa3b_centro-sx_35kV-90uA.npz \
     xrf-viz
@@ -20,7 +20,7 @@ wslc run --name dash-xrf-viewer -p 8765:8765 \
 
 In one line: 
 ```powershell
-wslc run --name dash-xrf-viewer -p 8765:8765 -v /abs/path/to/xrf/data:/data:ro -e XRF_CUBE=/data/Mantegna_mappa3b_centro-sx_35kV-90uA.npz xrf-viz
+wslc run --name dash-xrf-viewer -p 127.0.0.1:8765:8765 -v /abs/path/to/xrf/data:/data:ro -e XRF_CUBE=/data/Mantegna_mappa3b_centro-sx_35kV-90uA.npz xrf-viz
 ```
 
 

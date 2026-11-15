@@ -34,8 +34,23 @@ jobs:
           version = tomllib.loads(Path("pyproject.toml").read_text())["project"]["version"]
           assert f"v{version}" == os.environ["RELEASE_TAG"], f"tag v{version} does not match input {os.environ['RELEASE_TAG']}"
           PY
+      - run: uv sync --locked
+      - run: uv run --locked pytest -q
       - run: uv build
       - run: uvx --from twine twine check dist/*
+      - name: Install the built wheel in a clean env and smoke-test it
+        run: |
+          uv venv /tmp/xrf-smoke
+          uv pip install --python /tmp/xrf-smoke/bin/python --quiet dist/*.whl
+          cd /tmp
+          /tmp/xrf-smoke/bin/python - <<'PY'
+          from xrf_visualizer.data import load_xrf_lines
+          from xrf_visualizer.ui import build_app
+
+          assert len(load_xrf_lines()) > 0
+          build_app(None)
+          print("wheel smoke OK")
+          PY
       - uses: actions/upload-artifact@v4
         with:
           name: pypi-dist

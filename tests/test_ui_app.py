@@ -825,7 +825,10 @@ def test_on_load_replaces_stale_selections(cube):
 
 
 @pytest.fixture
-def http_server():
+def http_server(monkeypatch):
+    # F10 gate off for loopback test servers (gate covered in test_readers).
+    monkeypatch.setattr("xrf_visualizer.data._assert_public_url",
+                        lambda url: None)
     handler = partial(http.server.SimpleHTTPRequestHandler, directory=str(FIX))
     httpd = socketserver.TCPServer(("127.0.0.1", 0), handler)
     threading.Thread(target=httpd.serve_forever, daemon=True).start()
