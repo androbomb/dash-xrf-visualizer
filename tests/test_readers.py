@@ -1,15 +1,23 @@
-"""Reader tests: fixtures round-trip, schema validation, XRFlines, real data_example metadata."""
+"""Reader tests: fixtures round-trip, schema, size limits, XRFlines, real data_example metadata."""
 import http.server
+import io
 import socketserver
 import subprocess
 import sys
 import threading
+import zipfile
 from pathlib import Path
 
 import numpy as np
 import pytest
 
-from xrf_visualizer.data import XrfCube, download_cube, load_cube, load_xrf_lines
+from xrf_visualizer.data import (
+    XrfCube,
+    download_cube,
+    load_cube,
+    load_cube_bytes,
+    load_xrf_lines,
+)
 
 FIXTURES = Path(__file__).parent / "fixtures"
 DATA_EXAMPLE = Path(__file__).parent.parent / "data_example"
@@ -124,3 +132,71 @@ def test_download_cube_name_from_content_disposition():
     finally:
         httpd.shutdown()
         httpd.server_close()
+
+
+# F12: expanded-cube size limit, checked on file metadata before allocation.
+
+
+def _npy_header_only(shape, dtype="float32", version=(1, 0)):
+    """A syntactically complete NPY header (magic+version+dict), zero data bytes.
+
+    write_array_header_*_0 emits the magic itself, so the result is a valid
+    file header followed by nothing: a real file would continue with the
+    declared data, but the loader rejects it before ever reading data.
+    """
+    buf = io.BytesIO()
+    header = {"descr": np.dtype(dtype).descr, "fortran_order": False, "shape": shape}
+    if version >= (2, 0):
+        np.lib.format.write_array_header_2_0(buf, header)
+    else:
+        np.lib.format.write_array_header_1_0(buf, header)
+    return buf.getvalue()
+
+
+HUGE = (1, 1, 1_000_000_000)  # float32 -> 4 GB declared, 0 bytes present
+
+
+def test_npy_header_only_rejected_before_allocation(tmp_path):
+    p = tmp_path / "huge.npy"
+    p.write_bytes(_npy_header_only(HUGE))
+    with pytest.raises(ValueError, match="exceeds"):
+        load_cube(p)
+
+
+def test_npy_v2_header_only_rejected(tmp_path):
+    p = tmp_path / "huge.npy"
+    p.write_bytes(_npy_header_only(HUGE, version=(2, 0)))
+    with pytest.raises(ValueError, match="exceeds"):
+        load_cube(p)
+
+
+def test_npz_header_only_rejected_before_allocation(tmp_path):
+    # the zeros case: a tiny file on disk declaring gigabytes when expanded
+    p = tmp_path / "huge.npz"
+    with zipfile.ZipFile(p, "w", compression=zipfile.ZIP_DEFLATED) as z:
+        z.writestr("img.npy", _npy_header_only(HUGE))
+    with pytest.raises(ValueError, match="exceeds"):
+        load_cube(p)
+
+
+def test_load_cube_bytes_header_only_rejected(tmp_path):
+    # the upload path has no raw-byte cap, so the expanded check is its guard
+    p = tmp_path / "huge.npz"
+    with zipfile.ZipFile(p, "w") as z:
+        z.writestr("img.npy", _npy_header_only(HUGE))
+    with pytest.raises(ValueError, match="exceeds"):
+        load_cube_bytes(p.read_bytes(), "huge.npz")
+
+
+def test_max_bytes_parameter_npz():
+    expanded = 48 * 64 * C * 4  # float32, synthetic_cube.npz
+    load_cube(FIXTURES / "synthetic_cube.npz", max_bytes=expanded)
+    with pytest.raises(ValueError, match="exceeds"):
+        load_cube(FIXTURES / "synthetic_cube.npz", max_bytes=expanded - 1)
+
+
+def test_max_bytes_parameter_h5():
+    expanded = 48 * 64 * C * 4  # float32, synthetic_cube.h5
+    load_cube(FIXTURES / "synthetic_cube.h5", max_bytes=expanded)
+    with pytest.raises(ValueError, match="exceeds"):
+        load_cube(FIXTURES / "synthetic_cube.h5", max_bytes=expanded - 1)

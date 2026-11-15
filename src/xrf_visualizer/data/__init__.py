@@ -15,6 +15,7 @@ import json
 import os
 import tempfile
 import urllib.request
+import zipfile
 from dataclasses import dataclass
 from pathlib import Path
 from urllib.parse import unquote, urlparse
@@ -23,6 +24,7 @@ import h5py
 import numpy as np
 
 __all__ = [
+    "MAX_CUBE_BYTES",
     "XrfCube",
     "load_cube",
     "load_cube_bytes",
@@ -72,15 +74,48 @@ def _validate_energy(energy: np.ndarray, n_channels: int, path: Path) -> np.ndar
     return energy
 
 
-def load_cube(path: str | Path) -> XrfCube:
-    """Load an XRF cube from .h5/.hdf5, .npz or .npy (key/dataset ``img``)."""
+MAX_CUBE_BYTES = 1024 ** 3  # expanded-cube cap (bytes); default for all readers
+
+
+def _npy_expanded_bytes(f) -> int:
+    """Expanded byte count of an NPY stream, from its header only (no data read).
+
+    Works on any binary file-like (plain file or a .npz member via ZipExtFile),
+    so a cube whose header declares gigabytes (e.g. compressed zeros) is
+    rejected before any allocation.
+    """
+    major, minor = np.lib.format.read_magic(f)
+    read_header = (np.lib.format.read_array_header_2_0 if (major, minor) >= (2, 0)
+                   else np.lib.format.read_array_header_1_0)
+    shape, _fortran, dtype = read_header(f)
+    return int(np.prod(shape, dtype=np.int64)) * dtype.itemsize
+
+
+def _require_within_budget(expanded: int, name: str, max_bytes: int) -> None:
+    if expanded > max_bytes:
+        raise ValueError(
+            f"{name}: expanded cube is ~{expanded // (1024 * 1024)} MB, exceeds "
+            f"the {max_bytes // (1024 * 1024)} MB limit")
+
+
+def load_cube(path: str | Path, max_bytes: int = MAX_CUBE_BYTES) -> XrfCube:
+    """Load an XRF cube from .h5/.hdf5, .npz or .npy (key/dataset ``img``).
+
+    The expanded cube must fit ``max_bytes`` (default MAX_CUBE_BYTES); the
+    check runs on file metadata (NPY/NPZ array header, HDF5 shape/dtype)
+    before any array is materialized, so a tiny file that expands huge
+    (e.g. compressed zeros) is rejected without allocating it.
+    """
     p = Path(path)
     suffix = p.suffix.lower()
 
     if suffix == ".npz":
+        with zipfile.ZipFile(p) as zf:
+            if "img.npy" not in zf.namelist():
+                raise ValueError(f"{p.name}: missing 'img' key (found: {sorted(zf.namelist())})")
+            with zf.open("img.npy") as img_f:
+                _require_within_budget(_npy_expanded_bytes(img_f), p.name, max_bytes)
         with np.load(p, allow_pickle=False) as z:
-            if "img" not in z:
-                raise ValueError(f"{p.name}: missing 'img' key (found: {sorted(z.files)})")
             arr = z["img"]
             # validate shape/axes before touching arr.shape[-1] (scalar img)
             validate_cube_array(arr, p.name)
@@ -88,6 +123,8 @@ def load_cube(path: str | Path) -> XrfCube:
         return XrfCube(p, arr, energy)
 
     if suffix == ".npy":
+        with open(p, "rb") as f:
+            _require_within_budget(_npy_expanded_bytes(f), p.name, max_bytes)
         arr = np.load(p, allow_pickle=False)
         validate_cube_array(arr, p.name)
         return XrfCube(p, arr, None)
@@ -99,6 +136,8 @@ def load_cube(path: str | Path) -> XrfCube:
             ds = f["img"]
             if not isinstance(ds, h5py.Dataset):
                 raise ValueError(f"{p.name}: 'img' must be a dataset, found {type(ds).__name__}")
+            _require_within_budget(
+                int(np.prod(ds.shape, dtype=np.int64)) * ds.dtype.itemsize, p.name, max_bytes)
             arr = np.asarray(ds[...])
         validate_cube_array(arr, p.name)
         return XrfCube(p, arr, None)
@@ -114,7 +153,7 @@ def sniff_format(data: bytes) -> str:
     raise ValueError("unrecognized file format (expected .npy, .npz or HDF5 magic bytes)")
 
 
-def load_cube_bytes(data: bytes, name: str = "") -> XrfCube:
+def load_cube_bytes(data: bytes, name: str = "", max_bytes: int = MAX_CUBE_BYTES) -> XrfCube:
     """Load a cube from in-memory bytes (uploads/downloads).
 
     Format comes from the name's extension when it is a known one, otherwise
@@ -132,7 +171,7 @@ def load_cube_bytes(data: bytes, name: str = "") -> XrfCube:
     try:
         with os.fdopen(fd, "wb") as f:
             f.write(data)
-        cube = load_cube(tmp)
+        cube = load_cube(tmp, max_bytes)
     finally:
         os.unlink(tmp)
     return XrfCube(Path(name) if name else Path("in-memory"), cube.array, cube.energy)
