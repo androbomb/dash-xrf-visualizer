@@ -85,7 +85,8 @@ def test_build_app(cube):
     app = build_app(cube)
     ids = _ids(app.layout, [])
     for expected in ("map", "spectrum", "roi-store", "ch-store", "points-store",
-                     "apply-roi", "apply-points", "apply-ch", "clear", "m", "q"):
+                     "apply-roi", "apply-points", "apply-ch", "clear", "m", "q",
+                     "show-energy", "xmode-store"):
         assert expected in ids
     clientside = "\n".join(app._inline_scripts)
     assert _component(app.layout, "map").config["doubleClick"] == "reset"
@@ -539,8 +540,10 @@ def test_download_current_map_is_cropped_pixel_exact_png(cube):
     raw = zlib.decompress(compressed)
     assert len(raw) == height * (1 + width * 4)
     assert all(raw[row * (1 + width * 4)] == 0 for row in range(height))
-    current = map_from_channels(cube, 100, 110)[10:12, 20:23]
-    value = (current[0, 0] - current.min()) / (current.max() - current.min())
+    # F7: the limits come from the full map, before the ROI crop
+    full = map_from_channels(cube, 100, 110)
+    current = full[10:12, 20:23]
+    value = (current[0, 0] - full.min()) / (full.max() - full.min())
     expected = np.rint(np.asarray(sample_colorscale(
         "Hot", [value], colortype="tuple")[0]) * 255).astype(np.uint8)
     assert np.array_equal(np.frombuffer(raw[1:5], dtype=np.uint8), [*expected, 255])
@@ -656,9 +659,9 @@ def test_build_app_empty():
         assert expected in ids
     # figures render the empty state without a cube (raw figure, dash 4.5 single-Output)
     f = _cb(app, "map.figure")([0, 0], [0, 0, 0, 0], [], "Viridis", [],
-                                {"zmin": None, "zmax": None}, None, 0)
+                                {"zmin": None, "zmax": None}, None, None, 0)
     assert not f.data
-    f = _cb(app, "spectrum.figure")([0, 0, 0, 0], [], [0, 0], [], None, 0)
+    f = _cb(app, "spectrum.figure")([0, 0, 0, 0], [], [0, 0], [], None, None, 0)
     assert not f.data
 
 
@@ -813,3 +816,125 @@ def test_on_load_link(empty_app, cube, http_server):
                           inputs={"load-url.n_clicks": 1},
                           states={"url.value": "ftp://nope"})
     assert out2[0].startswith("Download failed")
+
+
+# ------------------------------------------------------- step 2: audit F3-F7
+
+def test_clamp_roi_preserves_explicit_zero():
+    # F3: an explicit 0 is a value, not "unset"
+    assert _clamp_roi(H, W, 0, 0, 0, 0) == [0, 0, 0, 0]
+    assert _clamp_roi(H, W, 0, 10, 0, 0) == [0, 10, 0, 0]
+    assert _clamp_roi(H, W, None, 0, 0, W) == [0, 0, 0, W]
+
+
+def test_empty_selections_render_zero_maps(cube):
+    # F3: empty channel interval / empty ROI produce zeros, not the full range
+    fig = map_figure(cube, 5, 5)
+    np.testing.assert_array_equal(np.asarray(fig.data[0]["z"]),
+                                  np.zeros((H, W), dtype=np.float64))
+    spec = spectrum_figure(cube, roi=[10, 10, 20, 20])
+    np.testing.assert_array_equal(np.asarray(spec.data[0]["y"]),
+                                  np.zeros(C, dtype=np.float64))
+
+
+def test_line_channel_range_edge_tolerance():
+    # F5: P (Ka) 2.01 +/- 0.05 keV with m=0.01, q=0 -> (196, 207)
+    cal = {"m": 0.01, "q": 0.0}
+    assert _line_channel_range(2.01, 0.1, cal, 1000) == (196, 207)
+    # a grid point exactly on the window edge is included (F4 grid branch)
+    grid = np.arange(1000, dtype=np.float64) * 0.01
+    assert _line_channel_range(2.01, 0.1, cal, 1000, energy=grid) == (196, 207)
+
+
+def test_ch_from_relayout_half_pixel_round_trip():
+    # F6: the drawn edge of channel i is i-0.5; the inverse must recover i
+    assert _ch_from_relayout({"xrange": [9.5, 19.5]}, C) == [10, 20]
+    assert _ch_from_relayout({"xrange": [0.095, 0.195]}, C, 0.01, 0.0) == [10, 20]
+    # non-uniform file grid (F4): invert with searchsorted
+    grid = np.linspace(0.0, 10.0, 11)  # 1.0 keV per channel
+    assert _ch_from_relayout({"xrange": [2.5, 6.5]}, 11, energy=grid) == [3, 7]
+
+
+def test_roi_round_trip_half_pixel():
+    # F6: ROI [10,12,20,23] is drawn on x=[19.5,22.5], y=[11.5,9.5]
+    assert _roi_from_relayout({"xrange": [19.5, 22.5], "yrange": [11.5, 9.5]},
+                              H, W) == [10, 12, 20, 23]
+
+
+def _png_payload(png):
+    pos, compressed = 8, b""
+    while pos < len(png):
+        size = struct.unpack(">I", png[pos:pos + 4])[0]
+        kind = png[pos + 4:pos + 8]
+        if kind == b"IDAT":
+            compressed += png[pos + 8:pos + 8 + size]
+        pos += 12 + size
+    return zlib.decompress(compressed)
+
+
+def test_map_png_constant_matches_figure_range():
+    # F7: a constant map uses [v, v+1] like the figure -> the t=0 color
+    img = np.full((2, 2), 5.0)
+    png = _map_png_bytes(img)
+    first = np.frombuffer(_png_payload(png)[1:5], dtype=np.uint8)
+    expected = np.rint(np.asarray(sample_colorscale("Greys_r", [0.0],
+                                                   colortype="tuple")[0])
+                       * 255).astype(np.uint8)
+    assert np.array_equal(first, [*expected, 255])
+
+
+def test_spectrum_figure_file_energy_axis(cube):
+    # F4: the file energy grid is the axis when no manual calibration is set
+    grid = np.linspace(0.1, 10.1, C)
+    fig = spectrum_figure(cube, roi=[0, H, 0, W], grid=grid)
+    np.testing.assert_allclose(np.asarray(fig.data[0]["x"]), grid, rtol=0, atol=0)
+    assert fig.layout.xaxis.title.text == "E (keV; file axis)"
+    adc = spectrum_figure(cube, roi=[0, H, 0, W], grid=grid, show_energy=False)
+    np.testing.assert_array_equal(np.asarray(adc.data[0]["x"]), np.arange(C))
+    assert adc.layout.xaxis.title.text == "channel (ADC)"
+
+
+def test_map_figure_file_energy_axis_title(cube):
+    grid = np.linspace(0.1, 10.1, C)
+    fig = map_figure(cube, 10, 20, grid=grid)
+    assert f"{grid[10]:.12g}–{grid[19]:.12g} keV" in fig.layout.title.text
+    adc = map_figure(cube, 10, 20, grid=grid, show_energy=False)
+    assert "10–20 ADC channels" in adc.layout.title.text
+
+
+def test_xmode_toggle_follows_calibration(cube):
+    app = build_app(cube)
+    sw = _component(app.layout, "show-energy")
+    assert sw.value == []
+    toggle = _cb(app, "show-energy.value")
+    assert toggle(None, 0) == []
+    assert toggle({"m": 0.01, "q": 0.0}, 0) == ["energy"]
+    assert _cb(app, "xmode-store.data")(["energy"]) is True
+    assert _cb(app, "xmode-store.data")([]) is False
+
+
+def test_load_shows_file_calibration_in_m_q_fields():
+    # F4: a file energy axis is displayed in the m/q fields on load
+    arr = np.zeros((2, 3, 4), dtype=np.float64)
+    grid = np.array([0.5, 1.5, 2.5, 3.5])
+    buf = BytesIO()
+    np.savez(buf, img=arr, energy=grid)
+    app = build_app(None)
+    key = next(k for k, spec in app.callback_map.items()
+               if "load-msg.children" in k)
+    out = _http_callback(app, key,
+                         {"upload.contents":
+                          "data:;base64," + base64.b64encode(buf.getvalue()).decode(),
+                          "load-url.n_clicks": 0, "change-file.n_clicks": 0},
+                         {"upload.filename": "cube.npz", "url.value": "",
+                          "gen.data": 0},
+                         "upload.contents")
+    assert "Loaded cube.npz — 2 x 3 x 4" in out[0]
+    assert out[5] is None  # cal-store stays unset until the user applies it
+    assert float(out[-2]) == pytest.approx(1.0, abs=1e-9)
+    assert float(out[-1]) == pytest.approx(0.5, abs=1e-9)
+    assert "File energy axis" in out[23]
+
+
+if __name__ == "__main__":
+    raise SystemExit(pytest.main([__file__, "-v"]))

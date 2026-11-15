@@ -84,9 +84,11 @@ def _roi_from_relayout(rl, H, W):
         rl.get("yaxis.range[0]", 0), rl.get("yaxis.range[1]", H))))
     xa, xb = sorted((xa, xb))
     ya, yb = sorted((ya, yb))
-    x0 = max(0, min(int(np.floor(xa)), W))
+    # F6: the drawn edge of pixel i is i-0.5, so floor(a+0.5)/ceil(b) is
+    # the exact inverse of what the user selected on screen.
+    x0 = max(0, min(int(np.floor(xa + 0.5)), W))
     x1 = max(0, min(int(np.ceil(xb)), W))
-    y0 = max(0, min(int(np.floor(ya)), H))
+    y0 = max(0, min(int(np.floor(ya + 0.5)), H))
     y1 = max(0, min(int(np.ceil(yb)), H))
     return [y0, y1, x0, x1]
 
@@ -119,9 +121,9 @@ def _map_png_bytes(image, colorscale="Greys_r", zmin=None, zmax=None, log=False)
     else:
         low, high = 0.0, 1.0
     if high == low:
-        scaled = np.full(image.shape, 0.5)
-    else:
-        scaled = np.clip((image - low) / (high - low), 0, 1)
+        # F7: same constant-range rule as the figure, which uses [v, v+1]
+        high = low + 1.0
+    scaled = np.clip((image - low) / (high - low), 0, 1)
     scaled = np.nan_to_num(scaled, nan=0.0, posinf=1.0, neginf=0.0)
     rgb = np.rint(np.asarray(sample_colorscale(
         colorscale, scaled.ravel().tolist(), colortype="tuple")).reshape(*image.shape, 3) * 255
@@ -134,8 +136,12 @@ def _map_png_bytes(image, colorscale="Greys_r", zmin=None, zmax=None, log=False)
             + _png_chunk(b"IDAT", zlib.compress(rows)) + _png_chunk(b"IEND", b""))
 
 
-def _ch_from_relayout(rl, C, m=None, q=0):
-    """Spectrum zoom -> channel interval [s, e] from relayoutData; None = ignore."""
+def _ch_from_relayout(rl, C, m=None, q=0, energy=None):
+    """Spectrum zoom -> channel interval [s, e] from relayoutData; None = ignore.
+
+    energy: file energy grid (keV); when the x-axis is that grid (no manual
+    calibration) the zoom range is inverted with np.searchsorted (F4).
+    """
     if not rl:
         return None
     if any(k in ("xautorange", "xaxis.autorange") and rl[k] for k in rl):
@@ -150,17 +156,25 @@ def _ch_from_relayout(rl, C, m=None, q=0):
         a, b = sorted((a, b))
         eps = np.finfo(float).eps * max(1, abs(a), abs(b)) * 4
         a, b = a + eps, b - eps
-    s = max(0, min(int(np.floor(a)), C))
+    elif energy is not None:
+        grid = np.asarray(energy, dtype=np.float64)
+        eps = 4.0 * np.finfo(float).eps * max(1.0, abs(a), abs(b))
+        a = float(np.searchsorted(grid, a - eps, side="left"))
+        b = float(np.searchsorted(grid, b + eps, side="right"))
+    # F6: floor(a+0.5)/ceil(b) is the exact inverse of the drawn pixel edges
+    s = max(0, min(int(np.floor(a + 0.5)), C))
     e = max(0, min(int(np.ceil(b)), C))
     return [s, e]
 
 
 def _clamp_roi(H, W, y0, y1, x0, x1):
-    """Clamp/sort a numeric ROI to [0, H] x [0, W]; None values fall to edges."""
-    y0 = max(0, min(int(y0 or 0), H))
-    y1 = max(0, min(int(y1 or H), H))
-    x0 = max(0, min(int(x0 or 0), W))
-    x1 = max(0, min(int(x1 or W), W))
+    """Clamp/sort a numeric ROI to [0, H] x [0, W]. None means "not set" and
+    falls to the box edge (y0/x0 -> 0, y1/x1 -> H/W, so all-None = full frame);
+    any explicit value (including 0) is preserved and clamped (F3)."""
+    y0 = 0 if y0 is None else max(0, min(H, int(y0)))
+    y1 = H if y1 is None else max(0, min(H, int(y1)))
+    x0 = 0 if x0 is None else max(0, min(W, int(x0)))
+    x1 = W if x1 is None else max(0, min(W, int(x1)))
     return [min(y0, y1), max(y0, y1), min(x0, x1), max(x0, x1)]
 
 
@@ -174,18 +188,65 @@ def _parse_points(rows_s, cols_s):
     return list(zip(rows, cols))
 
 
-def _line_channel_range(line_energy, width, calibration, channels):
-    """Return the half-open ADC channel interval for a centered keV window."""
+def _line_channel_range(line_energy, width, calibration, channels, energy=None):
+    """Return the half-open ADC channel interval for a centered keV window.
+
+    energy: file energy grid (keV); the window is then inverted with
+    np.searchsorted (exact for non-uniform grids, F4). Otherwise E = m*i + q
+    with a few-ulp edge tolerance so decimal borders land on the right side
+    (F5): a channel center exactly on the edge is included, one just outside
+    is not.
+    """
     m, q = float(calibration["m"]), float(calibration["q"])
     line_energy = float(line_energy)
     width = float(str(width).strip().replace(",", "."))
     if not all(math.isfinite(v) for v in (m, q, line_energy, width)) or m <= 0 or width <= 0:
         raise ValueError("Calibration must be valid and width must be positive")
-    start = max(0, math.ceil((line_energy - width / 2 - q) / m))
-    end = min(channels, math.floor((line_energy + width / 2 - q) / m) + 1)
+    lo, hi = line_energy - width / 2, line_energy + width / 2
+    if energy is not None:
+        grid = np.asarray(energy, dtype=np.float64)
+        eps = 4.0 * np.finfo(float).eps * max(1.0, abs(lo), abs(hi))
+        start = max(0, int(np.searchsorted(grid, lo - eps, side="left")))
+        end = min(int(channels), int(np.searchsorted(grid, hi + eps, side="right")))
+    else:
+        lo_ch, hi_ch = (lo - q) / m, (hi - q) / m
+        eps = 4.0 * np.finfo(float).eps * max(1.0, abs(lo_ch), abs(hi_ch))
+        start = max(0, int(np.ceil(lo_ch - eps)))
+        end = min(int(channels), int(np.floor(hi_ch + eps)) + 1)
     if start >= end:
         raise ValueError("Selected line and width do not overlap cube channels")
     return start, end
+
+
+def _fit_energy_grid(grid):
+    """Least-squares (m, q) of E = m*i + q against a file energy grid (F4)."""
+    idx = np.arange(len(grid), dtype=np.float64)
+    m, q = np.polyfit(idx, np.asarray(grid, dtype=np.float64), 1)
+    return float(m), float(q)
+
+
+def _cal_matches_grid(calibration, grid):
+    """True when the stored m/q is the file axis itself (the linear fit of
+    the grid), i.e. the user has not overridden it with a manual calibration."""
+    if not calibration or grid is None:
+        return False
+    try:
+        m = float(calibration.get("m"))
+        q = float(calibration.get("q") or 0.0)
+    except (TypeError, ValueError):
+        return False
+    fit_m, fit_q = _fit_energy_grid(grid)
+    return (abs(m - fit_m) <= 1e-9 * max(1.0, abs(fit_m))
+            and abs(q - fit_q) <= 1e-9 * max(1.0, abs(fit_q)))
+
+
+def _x_on(xmode, m, grid):
+    """X-axis mode. The stored toggle (user choice) wins; xmode=None means
+    "store not wired" (legacy callers and tests) and keeps the old behavior:
+    energy whenever a manual calibration or a file grid is active."""
+    if xmode is None:
+        return m is not None or grid is not None
+    return bool(xmode) and (m is not None or grid is not None)
 
 
 def _add_elemental_line(rows, line_id):
@@ -294,7 +355,8 @@ def _spectrum_svg_bytes(spectrum, calibration, item, log=False):
 # ------------------------------------------------------------ figure builders
 
 def map_figure(cube, ch_start, ch_end, zmin=None, zmax=None,
-               colorscale="Greys_r", log=False, m=None, q=None, roi=None, points=None):
+               colorscale="Greys_r", log=False, m=None, q=None, roi=None, points=None,
+               show_energy=True, grid=None):
     """Current map: plain float64 channel sum, display options applied."""
     image = map_from_channels(cube, ch_start, ch_end)
     if log:
@@ -307,8 +369,14 @@ def map_figure(cube, ch_start, ch_end, zmin=None, zmax=None,
     if zmin is not None or zmax is not None:
         fig.update_coloraxes(cmin=float(zmin) if zmin is not None else None,
                              cmax=float(zmax) if zmax is not None else None)
-    interval = (f"{m * ch_start + (q or 0):.12g}–{m * ch_end + (q or 0):.12g} keV"
-                if m is not None else f"{ch_start}–{ch_end} ADC channels")
+    grid = np.asarray(grid, dtype=np.float64) if grid is not None else None
+    if show_energy and m is not None:
+        interval = f"{m * ch_start + (q or 0):.12g}–{m * ch_end + (q or 0):.12g} keV"
+    elif show_energy and grid is not None and 0 <= ch_start < ch_end <= grid.shape[0]:
+        # F4: the file energy axis (keV), even when non-uniform
+        interval = f"{grid[ch_start]:.12g}–{grid[ch_end - 1]:.12g} keV"
+    else:
+        interval = f"{ch_start}–{ch_end} ADC channels"
     fig.update_layout(title=f"Integrated over {interval}",
                       margin=dict(l=40, r=10, t=55, b=30))
     if roi:
@@ -325,10 +393,13 @@ def map_figure(cube, ch_start, ch_end, zmin=None, zmax=None,
     return fig
 
 
-def spectrum_figure(cube, roi=None, points=None, m=None, q=None, channel_range=None, log=False):
+def spectrum_figure(cube, roi=None, points=None, m=None, q=None, channel_range=None,
+                    log=False, show_energy=True, grid=None):
     """Current spectrum: plain float64 pixel sum (points win over ROI).
 
-    With m != 0 the x-axis is the calibrated energy axis E = m*i + q (keV).
+    With m != 0 the x-axis is the calibrated energy axis E = m*i + q (keV);
+    with a file energy grid it is that grid (F4); with show_energy=False the
+    axis is always raw ADC channels (the calibration-check toggle).
     """
     H, W, C = cube.shape
     if points:
@@ -340,9 +411,12 @@ def spectrum_figure(cube, roi=None, points=None, m=None, q=None, channel_range=N
         selection = f"Box: y {y0}–{y1}, x {x0}–{x1}"
     if log:
         spec = np.log1p(spec)
-    if m is not None:
+    grid = np.asarray(grid, dtype=np.float64) if grid is not None else None
+    if show_energy and m is not None:
         e = calibrate(C, m, q or 0.0)
         x, xlab = e, f"E (keV; m={m}, q={q or 0})"
+    elif show_energy and grid is not None and grid.shape[0] == C:
+        x, xlab = grid, "E (keV; file axis)"
     else:
         x, xlab = np.arange(C), "channel (ADC)"
     # go.Scatter (not px.line): px.line wants a pandas frame for plain arrays
@@ -352,9 +426,13 @@ def spectrum_figure(cube, roi=None, points=None, m=None, q=None, channel_range=N
                       margin=dict(l=50, r=10, t=55, b=30))
     if channel_range:
         start, end = channel_range
-        limits = [start - 0.5, end - 0.5]
-        if m is not None:
-            limits = [m * i + (q or 0.0) for i in limits]
+        if show_energy and m is not None:
+            limits = [m * i + (q or 0.0) for i in (start - 0.5, end - 0.5)]
+        elif (show_energy and grid is not None and grid.shape[0] == C
+                and 0 <= start < end <= C):
+            limits = [float(grid[start]), float(grid[end - 1])]
+        else:
+            limits = [start - 0.5, end - 0.5]
         fig.update_xaxes(range=sorted(limits))
     return fig
 
@@ -394,7 +472,8 @@ def build_app(cube=None):
     """
     arr = _as_array(cube)
     state = {"cube": arr,
-             "name": Path(getattr(cube, "path", "") or "cube").name}
+             "name": Path(getattr(cube, "path", "") or "cube").name,
+             "energy": getattr(cube, "energy", None)}
     H, W, C = arr.shape if arr is not None else (0, 0, 0)
     app = _XrfDash(__name__, external_stylesheets=[dbc.themes.DARKLY])
     app.layout = dbc.Container(fluid=True, children=[
@@ -500,6 +579,10 @@ def build_app(cube=None):
                         id="q", type="text", value="", className="form-control")], width=6),
                     dbc.Col(dbc.Button("Apply calibration", id="apply-calibration", n_clicks=0, outline=True, color="info"), width=12),
                     dbc.Col(html.Div(id="cal-msg", className="text-info small"), width=12),
+                    dbc.Col(dcc.Checklist(id="show-energy", options=[
+                        {"label": "X-axis: Energy (keV) — swap ADC/Energy to check calibration",
+                         "value": "energy"}], value=[],
+                        labelStyle={"color": "var(--bs-body-color)"}), width=12),
                 ]),
                 html.B("Fit calibration from channel/energy points"),
                 dbc.Row(className="g-2 align-items-end mt-1", children=[
@@ -567,6 +650,7 @@ def build_app(cube=None):
         dcc.Store(id="points-store", data=[]),
         dcc.Store(id="scale-store", data={"zmin": None, "zmax": None}),
         dcc.Store(id="cal-store", data=None),
+        dcc.Store(id="xmode-store", data=False),
         dcc.Store(id="cal-points-store", data=[]),
         dcc.Store(id="elemental-rows-store", data=[]),
         dcc.Store(id="elemental-meta", data=[]),
@@ -582,19 +666,26 @@ def build_app(cube=None):
     @app.callback(Output("map", "figure"),
                   Input("ch-store", "data"), Input("roi-store", "data"),
                   Input("points-store", "data"), Input("colorscale", "value"), Input("log", "value"),
-                  Input("scale-store", "data"), Input("cal-store", "data"), Input("gen", "data"))
-    def _map_figure(ch, roi, points, cscale, log, scale, calibration, _gen):
+                  Input("scale-store", "data"), Input("cal-store", "data"),
+                  Input("xmode-store", "data"), Input("gen", "data"))
+    def _map_figure(ch, roi, points, cscale, log, scale, calibration, xmode, _gen):
         c = state["cube"]
         if c is None:
             return _empty_figure("No cube loaded — upload a file or paste a link above")
-        s, e = ch
-        if e is None or e <= (s or 0):  # stale/empty interval -> full channels
-            s, e = 0, c.shape[2]
+        s, e = ch or [0, c.shape[2]]
+        # F3: None means "not set" only; an empty interval (e <= s) stays
+        # empty and renders zero maps instead of the full channel range.
+        if s is None:
+            s = 0
+        if e is None:
+            e = c.shape[2]
         # dash 4.5: single Output -> return the raw value (no [..] wrap)
         scale = scale or {}
         m, q = (calibration or {}).get("m"), (calibration or {}).get("q")
+        grid = state["energy"] if m is None else None
         return map_figure(c, s, e, scale.get("zmin"), scale.get("zmax"),
-                          cscale, bool(log), m, q, roi, points)
+                          cscale, bool(log), m, q, roi, points,
+                          show_energy=_x_on(xmode, m, grid), grid=grid)
 
     app.clientside_callback(
         """function(figure) {
@@ -644,23 +735,32 @@ def build_app(cube=None):
         c = state["cube"]
         if c is None:
             return no_update
-        start, end = channels
+        start, end = channels or [0, c.shape[2]]
         image = map_from_channels(c, start, end)
+        # F7: the limits come from the full map, before the ROI crop —
+        # exactly what the on-screen figure normalizes with.
+        full = np.log1p(image) if log else image
+        scale = scale or {}
+        zmin = scale.get("zmin")
+        zmax = scale.get("zmax")
+        if zmin is None:
+            zmin = float(full.min())
+        if zmax is None:
+            zmax = float(full.max())
         if roi:
             y0, y1, x0, x1 = _clamp_roi(*image.shape, *roi)
             image = image[y0:y1, x0:x1]
         if image.size == 0:
             return no_update
-        scale = scale or {}
-        png = _map_png_bytes(image, colorscale or "Greys_r",
-                             scale.get("zmin"), scale.get("zmax"), bool(log))
+        png = _map_png_bytes(image, colorscale or "Greys_r", zmin, zmax, bool(log))
         return dcc.send_bytes(png, "xrf_map.png")
 
     @app.callback(Output("spectrum", "figure"),
                   Input("roi-store", "data"), Input("points-store", "data"),
                   Input("ch-store", "data"), Input("log", "value"),
-                  Input("cal-store", "data"), Input("gen", "data"))
-    def _spec_figure(roi, pts, channels, log, calibration, _gen):
+                  Input("cal-store", "data"), Input("xmode-store", "data"),
+                  Input("gen", "data"))
+    def _spec_figure(roi, pts, channels, log, calibration, xmode, _gen):
         c = state["cube"]
         if c is None:
             return _empty_figure("No cube loaded")
@@ -668,11 +768,13 @@ def build_app(cube=None):
         if pts:  # drop points stale from a previous cube; all stale -> ROI
             keep = [p for p in pts if 0 <= p[0] < H and 0 <= p[1] < W]
             pts = keep or None
-        if roi and roi[1] <= roi[0] and roi[3] <= roi[2]:  # degenerate ROI -> full frame
-            roi = None
+        # F3: an empty ROI stays empty (zero spectrum); no full-frame fallback.
+        m, q = (calibration or {}).get("m"), (calibration or {}).get("q")
+        grid = state["energy"] if m is None else None
         return spectrum_figure(c, roi=roi, points=pts,
-                               m=(calibration or {}).get("m"), q=(calibration or {}).get("q"),
-                               channel_range=channels, log=bool(log))
+                               m=m, q=q,
+                               channel_range=channels, log=bool(log),
+                               show_energy=_x_on(xmode, m, grid), grid=grid)
 
     @app.callback(Output("roi-store", "data"),
                   Input("map", "relayoutData"), Input("map", "selectedData"),
@@ -705,20 +807,28 @@ def build_app(cube=None):
                   Input("spectrum", "relayoutData"), Input("apply-ch", "n_clicks"),
                   State("ch-store", "data"),
                   State("ch-s", "value"), State("ch-e", "value"),
-                  State("cal-store", "data"),
+                  State("cal-store", "data"), State("xmode-store", "data"),
                   prevent_initial_call=True)
-    def _set_ch(rl, n, cur, s, e, calibration):
+    def _set_ch(rl, n, cur, s, e, calibration, xmode):
         c = state["cube"]
         if c is None:
             return cur
         C = c.shape[2]
         if "apply-ch.n_clicks" in ctx.triggered_prop_ids:
-            s = max(0, min(int(s or 0), C))
-            e = max(0, min(int(e or C), C))
+            # F3: an explicit 0 is preserved; only None falls to the edge.
+            s = 0 if s is None else max(0, min(int(s), C))
+            e = C if e is None else max(0, min(int(e), C))
             return [min(s, e), max(s, e)]
         if ctx.triggered_id == "spectrum":
             cal = calibration or {}
-            r = _ch_from_relayout(rl, C, cal.get("m"), cal.get("q", 0))
+            m, q = cal.get("m"), cal.get("q", 0)
+            grid = state["energy"] if m is None else None
+            if _x_on(xmode, m, grid) and m is not None:
+                r = _ch_from_relayout(rl, C, m, q)
+            elif _x_on(xmode, m, grid) and grid is not None:
+                r = _ch_from_relayout(rl, C, energy=grid)
+            else:
+                r = _ch_from_relayout(rl, C)
             if r is not None:
                 return r
         return cur
@@ -955,7 +1065,11 @@ def build_app(cube=None):
             return no_update, "Load a cube first"
         try:
             channels = state["cube"].shape[2]
-            start, end = _line_channel_range(line_energy, width, calibration, channels)
+            grid = state["energy"]
+            if grid is not None and not _cal_matches_grid(calibration, grid):
+                grid = None  # explicit manual calibration overrides the file axis
+            start, end = _line_channel_range(line_energy, width, calibration, channels,
+                                             energy=grid)
             width = float(width)
             return [start, end], f"Integrating {line_energy:g} ± {width / 2:g} keV"
         except (KeyError, TypeError, ValueError, ZeroDivisionError) as e:
@@ -1049,6 +1163,21 @@ def build_app(cube=None):
             return no_update, "Enter finite m > 0 and q values", no_update
         return {"m": m, "q": q}, f"Applied: E = {m} × channel + {q} keV", False
 
+    @app.callback(Output("show-energy", "value"),
+                  Input("cal-store", "data"), Input("gen", "data"))
+    def _xmode_toggle(calibration, _gen):
+        """ADC/Energy swap (calibration check): checked while a calibration is
+        active — manual or the file energy axis shown in the fields. dcc.Checklist
+        has no `disabled` prop in dash 4.5, so the check state itself carries the
+        'usable' state; _x_on stays a no-op without calibration."""
+        if (calibration or {}).get("m") is not None or state["energy"] is not None:
+            return ["energy"]
+        return []
+
+    @app.callback(Output("xmode-store", "data"), Input("show-energy", "value"))
+    def _xmode_store(value):
+        return bool(value)
+
     @app.callback(Output("line-selected", "children"), Input("line-select", "value"))
     def _show_selected_line(value):
         if value is None:
@@ -1067,23 +1196,32 @@ def build_app(cube=None):
         return {"zmin": zmin, "zmax": zmax}, zmin, zmax
 
     # --- M6: file loading (upload / link / change) ---------------------------
-    def _commit_load(arr, name, gen):
+    def _commit_load(arr, name, gen, cube=None):
         """One commit block for load and clear (audit 1, 19). The new dataset
         owns all selections, so no stale ROI, channels, points, scale or
-        calibration state survives a load (audit 2)."""
+        calibration state survives a load (audit 2). A file energy axis is
+        shown in the m/q fields like a manual calibration (F4)."""
         h, w, c = arr.shape if arr is not None else (0, 0, 0)
         if arr is None:
             msg, cname = "Cube cleared — upload a file or paste a link.", "— no cube loaded"
         else:
             msg, cname = (f"Loaded {name} — {h} x {w} x {c}",
                           f"— {name} ({h} x {w} x {c})")
+        file_m = file_q = None
+        if cube is not None and getattr(cube, "energy", None) is not None:
+            file_m, file_q = _fit_energy_grid(cube.energy)
+        cal_msg = (f"File energy axis: m = {file_m:.17g}, q = {file_q:.17g} keV "
+                   f"(linear fit) — Apply calibration to use it"
+                   if file_m is not None else "")
         return (msg, cname, (gen or 0) + 1,
                 None, None,
                 None, [], 0,
                 [0, h, 0, w], [0, c], [],
                 {"zmin": None, "zmax": None},
                 0, h, 0, w, 0, c,
-                [], [], None, None, "", "")
+                [], [], None, None, "", cal_msg,
+                format(file_m, ".17g") if file_m is not None else None,
+                format(file_q, ".17g") if file_q is not None else None)
 
     @app.callback([Output("load-msg", "children"), Output("cube-name", "children"),
                    Output("gen", "data"),
@@ -1104,7 +1242,9 @@ def build_app(cube=None):
                    Output("cal-point-x", "value", allow_duplicate=True),
                    Output("cal-point-y", "value", allow_duplicate=True),
                    Output("cal-point-msg", "children", allow_duplicate=True),
-                   Output("cal-msg", "children", allow_duplicate=True)],
+                   Output("cal-msg", "children", allow_duplicate=True),
+                   Output("m", "value", allow_duplicate=True),
+                   Output("q", "value", allow_duplicate=True)],
                   Input("upload", "contents"), State("upload", "filename"),
                   Input("load-url", "n_clicks"), State("url", "value"),
                   Input("change-file", "n_clicks"),
@@ -1122,27 +1262,29 @@ def build_app(cube=None):
         """
         if ctx.triggered_id == "change-file":
             state["cube"], state["name"] = None, ""
+            state["energy"] = None
             state["elemental_maps"], state["elemental_spectrum"] = [], None
             return _commit_load(None, "", gen)
         if ctx.triggered_id == "load-url":
             if not (url and url.strip()):
-                return ("Enter a URL first",) + (no_update,) * 23
+                return ("Enter a URL first",) + (no_update,) * 25
             try:
                 cube = download_cube(url.strip())
             except Exception as e:
-                return (f"Download failed: {e}",) + (no_update,) * 23
+                return (f"Download failed: {e}",) + (no_update,) * 25
             arr, name = cube.array, cube.path.name
         elif contents:
             try:
                 _, b64 = contents.split(",", 1)
                 cube = load_cube_bytes(base64.b64decode(b64), filename or "")
             except Exception as e:
-                return (f"Upload failed: {e}",) + (no_update,) * 23
+                return (f"Upload failed: {e}",) + (no_update,) * 25
             arr, name = cube.array, Path(filename or "cube").name
         else:
-            return (no_update,) * 24
+            return (no_update,) * 26
         state["cube"], state["name"] = arr, name
+        state["energy"] = cube.energy
         state["elemental_maps"], state["elemental_spectrum"] = [], None
-        return _commit_load(arr, name, gen)
+        return _commit_load(arr, name, gen, cube)
 
     return app
