@@ -360,9 +360,13 @@ def _spectrum_svg_bytes(spectrum, calibration, item, log=False):
 
 def map_figure(cube, ch_start, ch_end, zmin=None, zmax=None,
                colorscale="Greys_r", log=False, m=None, q=None, roi=None, points=None,
-               show_energy=True, grid=None):
-    """Current map: plain float64 channel sum, display options applied."""
-    image = map_from_channels(cube, ch_start, ch_end)
+               show_energy=True, grid=None, image=None):
+    """Current map: plain float64 channel sum, display options applied.
+
+    ``image``: precomputed (H, W) sum from the UI cache; None -> reduce now.
+    """
+    if image is None:
+        image = map_from_channels(cube, ch_start, ch_end)
     if log:
         image = np.log1p(image)
         zmin = np.log1p(max(0.0, float(zmin))) if zmin is not None else None
@@ -398,21 +402,25 @@ def map_figure(cube, ch_start, ch_end, zmin=None, zmax=None,
 
 
 def spectrum_figure(cube, roi=None, points=None, m=None, q=None, channel_range=None,
-                    log=False, show_energy=True, grid=None):
+                    log=False, show_energy=True, grid=None, spectrum=None):
     """Current spectrum: plain float64 pixel sum (points win over ROI).
 
     With m != 0 the x-axis is the calibrated energy axis E = m*i + q (keV);
     with a file energy grid it is that grid (F4); with show_energy=False the
     axis is always raw ADC channels (the calibration-check toggle).
+    ``spectrum``: precomputed (C,) sum from the UI cache; None -> reduce now.
     """
     H, W, C = cube.shape
     if points:
-        spec = spectrum_from_points(cube, [p[0] for p in points], [p[1] for p in points])
         selection = "Points: " + "; ".join(f"(row {y}, col {x})" for y, x in points)
+        spec = (spectrum_from_points(cube, [p[0] for p in points],
+                                     [p[1] for p in points])
+                if spectrum is None else spectrum)
     else:
         y0, y1, x0, x1 = roi if roi else [0, H, 0, W]
-        spec = spectrum_from_roi(cube, y0, y1, x0, x1)
         selection = f"Box: y {y0}–{y1}, x {x0}–{x1}"
+        spec = (spectrum_from_roi(cube, y0, y1, x0, x1)
+                if spectrum is None else spectrum)
     if log:
         spec = np.log1p(spec)
     grid = np.asarray(grid, dtype=np.float64) if grid is not None else None
@@ -479,8 +487,42 @@ def build_app(cube=None):
              "name": Path(getattr(cube, "path", "") or "cube").name,
              "energy": getattr(cube, "energy", None),
              "revision": 0,   # server-side dataset revision (F11)
-             "result": None}  # committed ResultRecord, or None
-    state_lock = threading.Lock()  # guards revision bump and result commit
+             "result": None,  # committed ResultRecord, or None
+             "map_cache": None,   # last (H, W) sum, keyed (revision, s, e)
+             "spec_cache": None}  # last (C,) sum, keyed (revision, selection)
+    state_lock = threading.Lock()  # guards revision bump, result commit, cache slots
+
+    def _cached_map_image(c, revision, s, e):
+        """Last (H, W) channel sum for (revision, s, e): a palette, ROI,
+        title or scale change must not re-run the reduction (audit item 15)."""
+        key = (revision, int(s), int(e))
+        with state_lock:
+            hit = state["map_cache"]
+        if hit is not None and hit[0] == key:
+            return hit[1]
+        image = map_from_channels(c, s, e)
+        with state_lock:
+            state["map_cache"] = (key, image)
+        return image
+
+    def _cached_spectrum(c, revision, roi, pts):
+        """Last (C,) sum for (revision, selection): same rule as _cached_map_image."""
+        if pts:
+            key = (revision, "pts", tuple(tuple(p) for p in pts))
+            get = lambda: spectrum_from_points(c, [p[0] for p in pts],
+                                               [p[1] for p in pts])
+        else:
+            y0, y1, x0, x1 = roi if roi else [0, c.shape[0], 0, c.shape[1]]
+            key = (revision, "roi", y0, y1, x0, x1)
+            get = lambda: spectrum_from_roi(c, y0, y1, x0, x1)
+        with state_lock:
+            hit = state["spec_cache"]
+        if hit is not None and hit[0] == key:
+            return hit[1]
+        spec = get()
+        with state_lock:
+            state["spec_cache"] = (key, spec)
+        return spec
     H, W, C = arr.shape if arr is not None else (0, 0, 0)
     app = _XrfDash(__name__, external_stylesheets=[dbc.themes.DARKLY])
     app.layout = dbc.Container(fluid=True, children=[
@@ -676,7 +718,7 @@ def build_app(cube=None):
                   Input("scale-store", "data"), Input("cal-store", "data"),
                   Input("xmode-store", "data"), Input("gen", "data"))
     def _map_figure(ch, roi, points, cscale, log, scale, calibration, xmode, _gen):
-        c = state["cube"]
+        c, rev = state["cube"], state["revision"]
         if c is None:
             return _empty_figure("No cube loaded — upload a file or paste a link above")
         s, e = ch or [0, c.shape[2]]
@@ -692,7 +734,8 @@ def build_app(cube=None):
         grid = state["energy"] if m is None else None
         return map_figure(c, s, e, scale.get("zmin"), scale.get("zmax"),
                           cscale, bool(log), m, q, roi, points,
-                          show_energy=_x_on(xmode, m, grid), grid=grid)
+                          show_energy=_x_on(xmode, m, grid), grid=grid,
+                          image=_cached_map_image(c, rev, s, e))
 
     app.clientside_callback(
         """function(figure) {
@@ -739,11 +782,11 @@ def build_app(cube=None):
                   State("colorscale", "value"), State("log", "value"),
                   State("scale-store", "data"), prevent_initial_call=True)
     def _download_map(_n, channels, roi, colorscale, log, scale):
-        c = state["cube"]
+        c, rev = state["cube"], state["revision"]
         if c is None:
             return no_update
         start, end = channels or [0, c.shape[2]]
-        image = map_from_channels(c, start, end)
+        image = _cached_map_image(c, rev, start, end)
         # F7: the limits come from the full map, before the ROI crop —
         # exactly what the on-screen figure normalizes with.
         full = np.log1p(image) if log else image
@@ -768,7 +811,7 @@ def build_app(cube=None):
                   Input("cal-store", "data"), Input("xmode-store", "data"),
                   Input("gen", "data"))
     def _spec_figure(roi, pts, channels, log, calibration, xmode, _gen):
-        c = state["cube"]
+        c, rev = state["cube"], state["revision"]
         if c is None:
             return _empty_figure("No cube loaded")
         H, W, _ = c.shape
@@ -781,7 +824,8 @@ def build_app(cube=None):
         return spectrum_figure(c, roi=roi, points=pts,
                                m=m, q=q,
                                channel_range=channels, log=bool(log),
-                               show_energy=_x_on(xmode, m, grid), grid=grid)
+                               show_energy=_x_on(xmode, m, grid), grid=grid,
+                               spectrum=_cached_spectrum(c, rev, roi, pts))
 
     @app.callback(Output("roi-store", "data"),
                   Input("map", "relayoutData"), Input("map", "selectedData"),
@@ -923,15 +967,17 @@ def build_app(cube=None):
             return no_update, "Each selected line needs a width", no_update
         # Dataset identity at Compute start; the result is committed only
         # if it is still current (F11).
-        revision, source_file = state["revision"], state["name"]
+        with state_lock:
+            c, revision, source_file = state["cube"], state["revision"], state["name"]
         maps, metadata = [], []
-        full_spectrum = spectrum_from_roi(c, 0, c.shape[0], 0, c.shape[1])
+        # Audit item 15: reuse the last reduction for (revision, selection).
+        full_spectrum = _cached_spectrum(c, revision, None, None)
         try:
             for row, width in zip(rows or [], widths or []):
                 line = _XRF_LINES[row["line_id"]]
                 start, end = _line_channel_range(line["value"], width,
                                                  calibration, c.shape[2])
-                image = map_from_channels(c, start, end)
+                image = _cached_map_image(c, revision, start, end)
                 finite = image[np.isfinite(image)]
                 if not finite.size:
                     raise ValueError(f"{line['element']}: map contains no finite values")

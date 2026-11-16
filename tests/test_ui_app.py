@@ -308,6 +308,44 @@ def test_http_selection_apply_and_figure_refresh(cube):
     assert roi == [7, 9, 11, 13]
 
 
+def test_figure_callbacks_reuse_last_reduction(cube, monkeypatch):
+    # Audit item 15: palette/log/channel-axis changes are presentation
+    # only; the channel sums run once per (revision, selection). Count
+    # the kernel calls instead of timing anything.
+    import xrf_visualizer.ui.app as app_mod
+    real_map, real_spec = app_mod.map_from_channels, app_mod.spectrum_from_roi
+    calls = []
+    def counting_map(*a, **k):
+        calls.append("map")
+        return real_map(*a, **k)
+    def counting_spec(*a, **k):
+        calls.append("spec")
+        return real_spec(*a, **k)
+    monkeypatch.setattr(app_mod, "map_from_channels", counting_map)
+    monkeypatch.setattr(app_mod, "spectrum_from_roi", counting_spec)
+    app = build_app(cube)
+    map_in = {"ch-store.data": [0, C], "roi-store.data": [0, H, 0, W],
+              "points-store.data": [], "colorscale.value": "Greys_r",
+              "log.value": [], "scale-store.data": None, "cal-store.data": None,
+              "xmode-store.data": None, "gen.data": 0}
+    spec_in = {"roi-store.data": [0, H, 0, W], "points-store.data": [],
+               "ch-store.data": [0, C], "log.value": [], "cal-store.data": None,
+               "xmode-store.data": None, "gen.data": 0}
+    _http_callback(app, "map.figure", map_in, {}, "gen.data")
+    _http_callback(app, "spectrum.figure", spec_in, {}, "gen.data")
+    assert calls == ["map", "spec"]
+    # Same selection, new palette / log axis: no new reduction.
+    _http_callback(app, "map.figure", {**map_in, "colorscale.value": "Viridis"},
+                   {}, "colorscale.value")
+    _http_callback(app, "spectrum.figure", {**spec_in, "log.value": ["log"]},
+                   {}, "log.value")
+    assert calls == ["map", "spec"]
+    # A new channel range is a new selection: reduced again.
+    _http_callback(app, "map.figure", {**map_in, "ch-store.data": [10, 20]},
+                   {}, "ch-store.data")
+    assert calls == ["map", "spec", "map"]
+
+
 def test_apply_roi_zoom_on_unequal_image_axes():
     h, w, c = 145, 212, 8
     app = build_app(np.zeros((h, w, c), dtype=np.float32))
