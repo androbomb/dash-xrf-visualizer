@@ -5,7 +5,6 @@ import subprocess
 import sys
 from pathlib import Path
 
-import jax
 import numpy as np
 import pytest
 
@@ -124,7 +123,11 @@ def test_backend_reporting():
     info = backend_info()
     assert info["platform"] == current_device().platform
     assert info["platform"] in {"cpu", "cuda", "gpu", "tpu"}
-    if info["platform"] != "cuda":
+    # Availability (item 16): probed via require_backend, independent of
+    # which platform the default device happens to be.
+    if HAS_CUDA:
+        assert require_backend("cuda").platform == "cuda"
+    else:
         with pytest.raises(RuntimeError, match="not available"):
             require_backend("cuda")
 
@@ -144,7 +147,13 @@ def _hex_map(platform_env: str) -> str:
     return r.stdout.strip().splitlines()[-1]
 
 
-HAS_CUDA = any(d.platform == "cuda" for d in jax.devices())
+# item 16: probe availability with jax.devices('cuda') (empty on a
+# CPU-only build), not the default device's platform string.
+try:
+    require_backend("cuda")
+    HAS_CUDA = True
+except RuntimeError:
+    HAS_CUDA = False
 
 
 @pytest.mark.skipif(not HAS_CUDA,
