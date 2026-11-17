@@ -78,6 +78,7 @@ uv pip install --python /tmp/xrf-testpypi/bin/python \
   --index-url https://test.pypi.org/simple \
   --extra-index-url https://pypi.org/simple \
   --index-strategy unsafe-best-match \
+  --no-cache \
   xrf-visualizer==X.Y.Z
 /tmp/xrf-testpypi/bin/python -c "from xrf_visualizer.ui import build_app; build_app(None); print('ok')"
 ```
@@ -88,6 +89,10 @@ Index gotchas:
   (TestPyPI has no `setuptools` and only a stale `dash` rc).
 - Plain pip-style two-index installs also need `--extra-index-url`
   `https://pypi.org/simple` for the same reason.
+- A just-published version can still be "not found" even when it is on
+  the TestPyPI page: uv caches index listings in a *global* cache
+  (`~/.cache/uv`, not per-venv) left by the previous release's install.
+  Keep `--no-cache` (or `uv cache clean` once).
 
 ### 4. PyPI
 
