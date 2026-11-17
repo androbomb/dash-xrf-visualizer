@@ -1,9 +1,9 @@
 # Deploy with pip / PyPI
 
 This is the pip-based alternative to the repository's `uv` workflow. It is a
-deployment guide and release checklist; **the project is not published on
-   PyPI yet**, so `pip install xrf-visualizer` will work only after the
-first release.
+deployment guide and release checklist. The project is published on PyPI
+(first release `v0.1.0`); `pip install xrf-visualizer` works for every
+version listed on the project page.
 
 ## End-user install (after publication)
 
@@ -55,22 +55,91 @@ variant.
    h5py, Dash, Plotly and Dash Bootstrap Components; there is no need to
    restructure the source tree or add a second package layout.
 
-## Release workflow
+## Admin: cut a release (vX.Y.Z)
 
-1. CI tests Python 3.12/3.13 and builds wheel + sdist on pushes and pull
-   requests. Release only from a reviewed `v<version>` tag matching
-   `[project].version`; PyPI releases are immutable, so do not reuse a
-   published version.
-2. Rehearse the artifact on TestPyPI and install it in a clean environment.
-3. Configure PyPI Trusted Publishing for owner `androbomb`, repository
-   `dash-xrf-visualizer`, workflow `publish.yml`, and GitHub environment
-   `pypi`. Use GitHub Actions OIDC and PyPA's supported publishing action
-   instead of storing a long-lived PyPI token. See the
-   [PyPI Trusted Publishing guide](https://docs.pypi.org/trusted-publishers/).
-4. For each release, build and validate artifacts, create/push the version
-   tag, then manually run the protected `Publish to PyPI` workflow for that
-   tag. It is intentionally not triggered by an ordinary push or tag push.
-   Verify the project page and install the exact version with pip.
+Both publish workflows are manual (`workflow_dispatch` with a required
+`tag` input); an ordinary push or tag push never publishes. Each run
+checks out the tag, verifies the tag matches `[project].version`, runs
+`uv sync --locked` + `pytest -q`, builds wheel + sdist, runs `twine
+check`, and smoke-tests the wheel in a clean venv before uploading.
+
+### 1. Bump version and lock (locally)
+
+```bash
+# pyproject.toml: version = "X.Y.Z"
+uv lock          # required: the publish gate runs `uv sync --locked`
+uv run --locked pytest -q   # must be green
+git add pyproject.toml uv.lock
+git commit -m "release: bump to X.Y.Z"
+```
+
+A stale `uv.lock` (bump without `uv lock`) fails the publish workflow at
+`uv sync --locked`.
+
+### 2. Push + tag
+
+```bash
+git push origin master
+git tag vX.Y.Z
+git push origin vX.Y.Z
+```
+
+The tag must point at the commit whose `pyproject.toml` carries `X.Y.Z`;
+the workflow fails otherwise.
+
+### 3. TestPyPI first
+
+GitHub → *Actions* → **Publish to TestPyPI** → *Run workflow* →
+`tag: vX.Y.Z`. If it is red, stop — do not continue to PyPI.
+
+Verify the artifact from outside. TestPyPI is the primary index, PyPI is
+an extra index for the dependencies, and `unsafe-best-match` is needed
+because the project also exists on PyPI (without it uv applies its
+first-index-only rule and hides the TestPyPI version). This flag is safe
+here: both indexes are official PyPA indexes.
+
+```bash
+uv venv /tmp/xrf-testpypi
+uv pip install --python /tmp/xrf-testpypi/bin/python \
+  --index-url https://test.pypi.org/simple \
+  --extra-index-url https://pypi.org/simple \
+  --index-strategy unsafe-best-match \
+  xrf-visualizer==X.Y.Z
+/tmp/xrf-testpypi/bin/python -c "from xrf_visualizer.ui import build_app; build_app(None); print('ok')"
+```
+
+Index gotchas:
+
+- `--index-url` alone *replaces* PyPI, so dependency resolution breaks
+  (TestPyPI has no `setuptools` and only a stale `dash` rc).
+- Plain pip-style two-index installs also need `--extra-index-url`
+  `https://pypi.org/simple` for the same reason.
+
+### 4. PyPI
+
+GitHub → *Actions* → **Publish to PyPI** → *Run workflow* →
+`tag: vX.Y.Z`. Publishing uses PyPI Trusted Publishing (OIDC, no token)
+configured for owner `androbomb`, workflow `publish.yml`, GitHub
+environment `pypi` — see the
+[PyPI Trusted Publishing guide](https://docs.pypi.org/trusted-publishers/).
+Then check the version is listed:
+
+```bash
+curl -s https://pypi.org/pypi/xrf-visualizer/json | grep -o '"X\.Y\.Z"'
+```
+
+### 5. GitHub Release (optional)
+
+```bash
+gh release create vX.Y.Z --title "vX.Y.Z" --notes "<release notes>"
+```
+
+### Pitfalls
+
+- Published versions are immutable: a broken release means bumping to the
+  next version and re-running from step 1 (a TestPyPI version can be
+  yanked instead).
+- Release only from a reviewed tag; never reuse a published version.
 
 The recommended build/upload flow is documented by the
 [Python Packaging User Guide](https://packaging.python.org/en/latest/guides/tool-recommendations/).
