@@ -16,7 +16,9 @@ the read-only audit of 2026-11-10 (legacy code + example files); facts marked
 - **No energy axis is stored in the files** (no `energy` key, no attributes).
   Peak channels (~130–160 of 500) map to different keV under different ranges,
   so the per-file energy range cannot be recovered from the file alone.
-- Storage dtype in the examples is **float32** (not integer counts).
+- Storage dtype in the examples is **float32**; integer count files
+  (int16/int32/uint16/uint32) are also accepted and converted to float64 at
+  load (exact for every int32/uint32 value).
 
 ## Energy axis and calibration (approved 2026-11-10)
 

@@ -55,9 +55,26 @@ def test_npz_with_energy(tmp_path):
     np.testing.assert_allclose(cube.energy, energy)
 
 
+def test_integer_counts_convert_to_float64(tmp_path):
+    # uint16/uint32 are legal count dtypes: exact float64 after load.
+    h, w, c = 4, 5, 6
+    u32 = np.arange(h * w * c, dtype=np.uint32).reshape(h, w, c)
+    u16 = (u32 % 60000).astype(np.uint16)
+    p = tmp_path / "u32.npy"
+    np.save(p, u32)
+    cube = load_cube(p)
+    assert cube.array.dtype == np.float64
+    np.testing.assert_array_equal(cube.array, u32)
+    p = tmp_path / "u16.npz"
+    np.savez(p, img=u16, energy=np.arange(c, dtype=np.float64))
+    cube = load_cube(p)
+    assert cube.array.dtype == np.float64
+    np.testing.assert_array_equal(cube.array, u16)
+
+
 CASES = [
     ("bad.npy", lambda p: np.save(p, np.zeros((4, 5), np.float32)), "3-D array"),
-    ("bad.npy", lambda p: np.save(p, np.zeros((4, 5, 6), np.int16)), "floating dtype"),
+    ("bad.npy", lambda p: np.save(p, np.zeros((4, 5, 6), np.complex64)), "floating or integer dtype"),
     ("bad.npz", lambda p: np.savez(p, wrong=np.zeros((4, 5, 6), np.float32)), "missing 'img'"),
     ("bad.npz", lambda p: np.savez(p, img=np.zeros((4, 5, 6), np.float32), energy=np.zeros(3)), "one value per channel"),
     (

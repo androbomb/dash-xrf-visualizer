@@ -461,7 +461,7 @@ def _as_array(cube):
         arr = getattr(cube, "array", None)
         if arr is None:
             raise TypeError(f"cube must be an XrfCube or ndarray, got {type(cube).__name__}")
-    validate_cube_array(arr, "cube")
+    arr = validate_cube_array(arr, "cube")
     return arr
 
 

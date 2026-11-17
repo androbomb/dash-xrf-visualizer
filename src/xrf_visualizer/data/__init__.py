@@ -1,8 +1,9 @@
 """Read XRF measurement cubes from .h5/.hdf5, .npz and .npy files.
 
 Contract (see scientific_notes.md):
-- cube: 3-D floating array, shape (H, W, C), channels last, stored as-is
-  (no implicit keV conversion: an uncalibrated cube stays on the ADC axis)
+- cube: 3-D counts array, shape (H, W, C), channels last, stored as-is
+  (no implicit keV conversion: an uncalibrated cube stays on the ADC axis);
+  integer dtypes are converted to float64 at load (exact for int32/uint32)
 - .h5/.hdf5 and .npy: top-level ``img`` dataset/array only
 - .npz: key ``img`` plus an optional ``energy`` vector (keV), float64,
   strictly increasing, one value per channel
@@ -48,20 +49,27 @@ _MAGIC = (
 @dataclass(frozen=True)
 class XrfCube:
     path: Path
-    array: np.ndarray          # (H, W, C), floating dtype as stored
+    array: np.ndarray          # (H, W, C), float64 (integer counts converted at load)
     energy: np.ndarray | None  # (C,) float64 keV, or None = channel (ADC) axis
 
 
-def validate_cube_array(arr: np.ndarray, label: str) -> None:
-    """3-D floating cube with strictly positive axes; ValueError otherwise.
-    Shape is checked before anything indexed by shape (e.g. the energy axis),
-    so a scalar 'img' fails with ValueError, not IndexError."""
+def validate_cube_array(arr: np.ndarray, label: str) -> np.ndarray:
+    """3-D counts cube with strictly positive axes; ValueError otherwise.
+
+    Integer dtypes are converted to float64 (exact for every int32/uint32
+    value); floating arrays pass through untouched. Returns the normalized
+    array. Shape is checked before anything indexed by shape (e.g. the energy
+    axis), so a scalar 'img' fails with ValueError, not IndexError.
+    """
     if arr.ndim != 3:
         raise ValueError(f"{label}: expected a 3-D array (H, W, C), got shape {arr.shape}")
     if any(size == 0 for size in arr.shape):
         raise ValueError(f"{label}: all axes must be positive, got shape {arr.shape}")
+    if np.issubdtype(arr.dtype, np.integer):
+        return arr.astype(np.float64)
     if not np.issubdtype(arr.dtype, np.floating):
-        raise ValueError(f"{label}: expected a floating dtype (counts), got {arr.dtype}")
+        raise ValueError(f"{label}: expected a floating or integer dtype (counts), got {arr.dtype}")
+    return arr
 
 
 def _validate_energy(energy: np.ndarray, n_channels: int, path: Path) -> np.ndarray:
@@ -119,8 +127,9 @@ def load_cube(path: str | Path, max_bytes: int = MAX_CUBE_BYTES) -> XrfCube:
                 _require_within_budget(_npy_expanded_bytes(img_f), p.name, max_bytes)
         with np.load(p, allow_pickle=False) as z:
             arr = z["img"]
-            # validate shape/axes before touching arr.shape[-1] (scalar img)
-            validate_cube_array(arr, p.name)
+            # validate shape/axes before touching arr.shape[-1] (scalar img);
+            # integer counts come back as float64
+            arr = validate_cube_array(arr, p.name)
             energy = _validate_energy(z["energy"], arr.shape[-1], p) if "energy" in z else None
         return XrfCube(p, arr, energy)
 
@@ -128,7 +137,7 @@ def load_cube(path: str | Path, max_bytes: int = MAX_CUBE_BYTES) -> XrfCube:
         with open(p, "rb") as f:
             _require_within_budget(_npy_expanded_bytes(f), p.name, max_bytes)
         arr = np.load(p, allow_pickle=False)
-        validate_cube_array(arr, p.name)
+        arr = validate_cube_array(arr, p.name)
         return XrfCube(p, arr, None)
 
     if suffix in (".h5", ".hdf5"):
@@ -141,7 +150,7 @@ def load_cube(path: str | Path, max_bytes: int = MAX_CUBE_BYTES) -> XrfCube:
             _require_within_budget(
                 int(np.prod(ds.shape, dtype=np.int64)) * ds.dtype.itemsize, p.name, max_bytes)
             arr = np.asarray(ds[...])
-        validate_cube_array(arr, p.name)
+        arr = validate_cube_array(arr, p.name)
         return XrfCube(p, arr, None)
 
     raise ValueError(f"unsupported XRF file: {p.name} (expected .h5, .hdf5, .npz or .npy)")
