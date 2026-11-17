@@ -29,32 +29,6 @@ rather than assuming that the generic pip package enables a GPU. The existing
 `deploy/uv/README.md` documents the project's tested CPU path and untested GPU
 variant.
 
-## Before the first release
-
-1. PyPI's JSON endpoint returned HTTP 404 for both `chnet-xrf-visualizer` and
-   `xrf-visualizer` on 2026-11-13, so neither project was listed then. This
-   does not reserve the name; recheck immediately before publishing. The
-   distribution name is now set in
-   `pyproject.toml`; the source import remains `xrf_visualizer`, so the source
-   directory does not need renaming.
-2. MIT is now recorded in `LICENSE` and `pyproject.toml`. Before the first
-   release, verify the copyright notice matches the actual rights holder and
-   review licenses of any material added to the package. Apache-2.0 is an
-   alternative if an explicit patent grant is important.
-3. Confirm the project URLs and supported Python classifiers in
-   `pyproject.toml`. Keep `requires-python = ">=3.12,<3.14"` unless CI and
-   dependencies are verified for another range; do not invent an individual
-   author/copyright holder if the project has not confirmed one.
-4. Build wheel and source distribution using the existing Hatchling backend;
-   inspect both archives to confirm `xrf_visualizer/data/XRFlines.json` ships
-   with the package (verified in the current wheel and sdist). Run `twine
-   check`, install the wheel in a clean venv, and smoke-test imports,
-   `load_xrf_lines()`, `load_cube()` and `build_app()`.
-5. Run the test suite on each supported Python version and verify dependency
-   resolution with pip. The current runtime dependencies include JAX, NumPy,
-   h5py, Dash, Plotly and Dash Bootstrap Components; there is no need to
-   restructure the source tree or add a second package layout.
-
 ## Admin: cut a release (vX.Y.Z)
 
 Both publish workflows are manual (`workflow_dispatch` with a required
@@ -133,6 +107,9 @@ curl -s https://pypi.org/pypi/xrf-visualizer/json | grep -o '"X\.Y\.Z"'
 ```bash
 gh release create vX.Y.Z --title "vX.Y.Z" --notes "<release notes>"
 ```
+
+Without `gh`: repo → *Releases* → **Draft a new release** → pick the
+existing tag `vX.Y.Z`.
 
 ### Pitfalls
 
