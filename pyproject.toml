@@ -1,6 +1,6 @@
 [project]
 name = "xrf-visualizer"
-version = "0.1.0"
+version = "0.1.1"
 description = "Plotly Dash visualizer for XRF cubes (HDF5/.npz/.npy): 2-D map + spectrum with spectral-interval and ROI selection."
 readme = "README.md"
 license = "MIT"
