@@ -1,0 +1,19 @@
+cff-version: 1.2.0
+message: "If you use this software, please cite it as below."
+title: "xrf-visualizer"
+type: software
+description: "Plotly Dash visualizer for XRF cubes (HDF5/.npz/.npy): 2-D map + spectrum with spectral-interval and ROI selection."
+authors:
+  - name: "androbomb"
+version: 0.1.2
+date-released: 2026-11-17
+license: MIT
+repository-code: "https://github.com/androbomb/dash-xrf-visualizer"
+url: "https://github.com/androbomb/dash-xrf-visualizer"
+keywords:
+  - x-ray-fluorescence
+  - xrf
+  - dash
+  - plotly
+  - jax
+  - scientific-visualization
