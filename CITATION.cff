@@ -4,7 +4,7 @@ title: "xrf-visualizer"
 type: software
 description: "Plotly Dash visualizer for XRF cubes (HDF5/.npz/.npy): 2-D map + spectrum with spectral-interval and ROI selection."
 authors:
-  - name: "androbomb"
+  - name: "Alessandro Bombini"
 version: 0.1.2
 date-released: 2026-11-17
 license: MIT

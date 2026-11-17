@@ -2,6 +2,7 @@
 name = "xrf-visualizer"
 version = "0.1.2"
 description = "Plotly Dash visualizer for XRF cubes (HDF5/.npz/.npy): 2-D map + spectrum with spectral-interval and ROI selection."
+authors = [{ name = "Alessandro Bombini" }]
 readme = "README.md"
 license = "MIT"
 requires-python = ">=3.12,<3.14"
