@@ -1,6 +1,12 @@
-"""xrf_visualizer: Plotly Dash visualizer for XRF cubes.
+"""xrf_visualizer: Plotly Dash visualizer for XRF cubes (HDF5/.npz/.npy).
 
-Stubs live here until M2 (readers) and M3 (JAX reductions) land.
+Subpackages: ``data`` (cube readers), ``processing`` (JAX/NumPy reductions),
+``ui`` (Dash app factory).
 """
 
-__version__ = "0.1.0"
+from importlib.metadata import PackageNotFoundError, version
+
+try:
+    __version__ = version("xrf-visualizer")
+except PackageNotFoundError:  # source checkout without an install
+    __version__ = "0+unknown"

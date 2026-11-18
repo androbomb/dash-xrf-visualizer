@@ -84,12 +84,21 @@ Requires [uv](https://docs.astral.sh/uv/); Python 3.12 is managed by uv via
 `.python-version`. In Jupyter/JupyterLab select the kernel
 **Python 3.12 (xrf-viz)**.
 
-The project is not published to PyPI yet. The distribution name is
-`xrf-visualizer`; see [`deploy/how_to_deploy_pip.md`](deploy/how_to_deploy_pip.md)
-for end-user installation and the maintainer release checklist. GitHub Actions
-tests Python 3.12/3.13 and builds distributions; publishing is a separate,
-manual workflow using PyPI Trusted Publishing. `uv` remains available as the
-lockfile-based development/Jupyter workflow.
+The distribution `xrf-visualizer` is published on PyPI. End users can install
+it with `uv` (or plain pip); the step-by-step setup for JupyterLab —
+including `quickstart.ipynb`, a self-contained notebook that needs no example
+data — is in [`docs/uv_jupyterlab_setup.md`](docs/uv_jupyterlab_setup.md):
+
+```bash
+uv venv xrf-visualizer-env && source xrf-visualizer-env/bin/activate
+uv pip install xrf-visualizer ipykernel jupyterlab
+python -m ipykernel install --user --name xrf-visualizer \
+    --display-name "Python (xrf-visualizer)"
+```
+
+Maintainer release checklist: [`deploy/how_to_deploy_pip.md`](deploy/how_to_deploy_pip.md).
+GitHub Actions tests Python 3.12/3.13 and builds distributions; publishing is a
+separate, manual workflow using PyPI Trusted Publishing.
 The project license is MIT; see [`LICENSE`](LICENSE).
 
 Dash's inline notebook frame defaults to 650 px tall. Increase it to avoid an
@@ -224,7 +233,9 @@ host, 2026-11-10). GPU is an opt-in, NOT TESTED variant —
 pyproject.toml / uv.lock / .python-version   uv project (root, versioned)
 src/xrf_visualizer/                          data / processing / ui (M2–M4)
 tests/                                       pytest; fixtures/ + golden.json
+quickstart.ipynb                             self-contained notebook (no data needed)
+docs/uv_jupyterlab_setup.md                  end-user setup: uv env + Jupyter kernel
 deploy/{docker,wslc,apptainer,uv}/           recipes & how-tos (Docker/Apptainer NOT TESTED)
-deploy/how_to_deploy_pip.md                  planned PyPI release + pip install guide
+deploy/how_to_deploy_pip.md                  PyPI release checklist + end-user install
 dash-xrf-analyzer/                           legacy reference (git-ignored, read-only)
 ```

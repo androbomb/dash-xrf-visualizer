@@ -5,23 +5,21 @@ deployment guide and release checklist. The project is published on PyPI
 (first release `v0.1.0`); `pip install xrf-visualizer` works for every
 version listed on the project page.
 
-## End-user install (after publication)
+## End-user install (from PyPI, with uv)
 
 ```bash
-python -m venv .venv
-# Linux/macOS
-. .venv/bin/activate
-# Windows PowerShell: .\.venv\Scripts\Activate.ps1
-python -m pip install --upgrade pip
-python -m pip install xrf-visualizer
-python -m pip install ipykernel  # needed to register/use this environment as a Jupyter kernel
-python -m ipykernel install --user --name xrf-viz \
+uv venv xrf-visualizer-env                 # once, in a working folder
+# activate: source xrf-visualizer-env/bin/activate (Linux/macOS)
+#           .\xrf-visualizer-env\Scripts\Activate.ps1 (Windows PowerShell)
+uv pip install xrf-visualizer ipykernel jupyterlab
+python -m ipykernel install --user --name xrf-visualizer \
   --display-name "Python (xrf-visualizer)"
+jupyter lab
 ```
 
-Select the named kernel in Jupyter, then follow the notebook pattern in
-`example.ipynb`: load the cube, call `build_app(cube)`, and use
-`app.run(jupyter_mode="inline", debug=False, jupyter_height=1000)`.
+Full step-by-step (Windows/Linux, PowerShell execution-policy fix,
+self-contained `quickstart.ipynb` to run):
+[`docs/uv_jupyterlab_setup.md`](../docs/uv_jupyterlab_setup.md).
 
 The regular PyPI install uses the project's default `jax` dependency. GPU JAX
 is platform/CUDA-specific; use the current JAX installation instructions
