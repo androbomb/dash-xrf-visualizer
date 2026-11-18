@@ -102,6 +102,10 @@ def test_dark_theme_control_labels_and_reversed_gray_default(cube):
     assert sample_colorscale("Greys_r", [0, 1]) == ["rgb(0, 0, 0)", "rgb(255, 255, 255)"]
     for component_id in ("log", "elemental-shared-scale"):
         assert _component(app.layout, component_id).labelStyle["color"] == "var(--bs-body-color)"
+    # Dash 4 dcc components (Dropdown) use light-only --Dash-* tokens; the
+    # layout root must re-theme them dark or text is white-on-white (darkly).
+    assert app.layout.style["--Dash-Fill-Inverse-Strong"] == "#343a40"
+    assert app.layout.style["--Dash-Text-Strong"].startswith("rgba(233, 236, 239")
     assert "Pick line" in str(app.layout)
 
 

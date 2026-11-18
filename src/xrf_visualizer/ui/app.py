@@ -58,6 +58,24 @@ _COLORSCALES = ("Greys_r", "Viridis", "Plasma", "Hot", "Jet")
 _ACCENT = "#4196B4"  # legacy infn_lightblue
 _XRF_LINES = load_xrf_lines()
 
+# Dash 4.x dcc components (Dropdown, Checklist, ...) are styled with the
+# built-in LIGHT --Dash-* token palette; Dash 4.5 has no dark-mode detection,
+# so under darkly they render e.g. white dropdown text on a white trigger.
+# CSS custom properties inherit, so defining the dark values on the layout
+# root re-themes every dcc component to match darkly.
+_DASH_DARK_VARS = {
+    "--Dash-Text-Strong": "rgba(233, 236, 239, 0.95)",
+    "--Dash-Text-Weak": "rgba(233, 236, 239, 0.65)",
+    "--Dash-Text-Disabled": "rgba(233, 236, 239, 0.45)",
+    "--Dash-Fill-Inverse-Strong": "#343a40",
+    "--Dash-Fill-Interactive-Strong": _ACCENT,
+    "--Dash-Fill-Interactive-Weak": "rgba(65, 150, 180, 0.15)",
+    "--Dash-Fill-Disabled": "rgba(255, 255, 255, 0.08)",
+    "--Dash-Stroke-Strong": "rgba(255, 255, 255, 0.25)",
+    "--Dash-Shading-Strong": "rgba(0, 0, 0, 0.55)",
+    "--Dash-Shading-Weak": "rgba(0, 0, 0, 0.35)",
+}
+
 
 class _XrfDash(Dash):
     def run(self, *args, **kwargs):
@@ -525,7 +543,7 @@ def build_app(cube=None):
         return spec
     H, W, C = arr.shape if arr is not None else (0, 0, 0)
     app = _XrfDash(__name__, external_stylesheets=[dbc.themes.DARKLY])
-    app.layout = dbc.Container(fluid=True, children=[
+    app.layout = dbc.Container(fluid=True, style=_DASH_DARK_VARS, children=[
         dbc.Row([
             dbc.Col([
                 html.H3("XRF visualizer", style={"display": "inline-block", "margin-right": 12}),
